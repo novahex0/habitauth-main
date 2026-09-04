@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: habit-auth
+    env: node
+    buildCommand: npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: ALLOWED_ORIGINS
+        value: "https://habit-auth.onrender.com"
+      - key: PUBLIC_URL
+        value: "https://habit-auth.onrender.com"
+      - key: JWT_SECRET
+        generateValue: true
