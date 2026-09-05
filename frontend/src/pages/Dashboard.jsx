@@ -3076,7 +3076,8 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Mobile Language Switcher */}
           <button
-            onClick={switchLanguage}
+            type="button"
+            onClick={() => setLangDropdownOpen(true)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -3090,6 +3091,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               cursor: 'pointer',
               lineHeight: 1
             }}
+            title={t('switchLang')}
           >
             <Globe size={12} color="#60a5fa" />
             <span style={{ fontSize: '13px' }}>{currentLanguageObj?.flag}</span>

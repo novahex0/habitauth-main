@@ -340,7 +340,7 @@ export default function App() {
       />
 
       <main style={{ flex: 1, paddingTop: '88px' }}>
-        {currentView === 'landing' && (
+        {(currentView === 'landing' || (!user && currentView === 'dashboard')) && (
           <div>
             <Hero
               user={user}
