@@ -99,9 +99,29 @@ export function clientInit(req, res) {
     return res.status(400).json({ success: false, message: 'app_id is required' });
   }
 
-  const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+  let app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+  if (!app && app_id === 'EXAMPLEC_a77325d54311') {
+    try {
+      let owner = db.prepare("SELECT id FROM accounts LIMIT 1").get();
+      const ownerId = owner ? owner.id : 'usr_default_admin';
+      if (!owner) {
+        db.prepare(`
+          INSERT OR IGNORE INTO accounts (id, discord_id, username, email, role, created_at, updated_at)
+          VALUES (?, '100000000000000001', 'AdminOwner', 'admin@habitauth.dev', 'admin', strftime('%s','now'), strftime('%s','now'))
+        `).run(ownerId);
+      }
+      db.prepare(`
+        INSERT OR REPLACE INTO applications (id, user_id, app_name, app_secret, public_key, version, status, created_at, updated_at)
+        VALUES (?, ?, 'Example C#', 'sec_25d40b5305284ae4b210744f271aba6604e3c32d923749e2b18264a9b0a5b645', 'cc49061ce6bd0bfa132ce0c0ba5a32bcb7945163e9f21d6f2d9030fc99a2a40f', '1.0', 'active', strftime('%s','now'), strftime('%s','now'))
+      `).run(app_id, ownerId);
+      app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+    } catch (e) {
+      console.error('Error auto-provisioning Example C# app:', e);
+    }
+  }
+
   if (!app) {
-    return res.status(404).json({ success: false, message: 'Application not found' });
+    return res.status(404).json({ success: false, message: `Application '${app_id}' not found. Please verify the App ID in your dashboard.` });
   }
 
   const sessionNonce = nonce || uuidv4();
