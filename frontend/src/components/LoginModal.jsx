@@ -26,7 +26,12 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
       try {
         const stored = localStorage.getItem('habit_pending_plan') || sessionStorage.getItem('habit_pending_plan');
         if (stored) {
-          setPendingPlan(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.fromOrderCard) {
+            setPendingPlan(parsed);
+          } else {
+            setPendingPlan(null);
+          }
         } else {
           setPendingPlan(null);
         }

@@ -381,12 +381,13 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
                               price: plan.rawPrice || plan.price.replace(/[^0-9.]/g, ''),
                               billing: plan.period,
                               billingCycle: billingCycle,
-                              rawPrice: plan.rawPrice
+                              rawPrice: plan.rawPrice,
+                              fromOrderCard: true
                             });
                             sessionStorage.setItem('habit_pending_plan', pendingData);
                             localStorage.setItem('habit_pending_plan', pendingData);
                           } catch (e) {}
-                          onOpenLogin('signin');
+                          onOpenLogin('signin', true);
                           return;
                         }
                         onSelectPlan({

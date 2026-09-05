@@ -5,7 +5,7 @@ import {
   CheckCircle2, AlertTriangle, Search, Filter, Lock, Unlock, KeyRound, Sparkles,
   Calendar, UserPlus, LogOut, Globe, Terminal, Activity, X, Sliders, Edit2, Menu,
   Send, Users2, Laptop, Clock, AlertCircle, Play, Code2, Wrench, Megaphone, FileCode, Crown, ChevronDown, ChevronUp, ChevronRight, Zap, Radio, Download, Snowflake,
-  Sun, Moon, LogIn, XCircle, Layers, Image, Database, HardDrive
+  Sun, Moon, LogIn, XCircle, Layers, Image, Database, HardDrive, ShoppingBag, ArrowRight
 } from 'lucide-react';
 import CustomConfirmModal from '../components/CustomConfirmModal';
 import SystemNoticeBanner from '../components/SystemNoticeBanner';
@@ -4332,6 +4332,171 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ORDERS / SUBSCRIPTIONS TAB ───────────────────────── */}
+        {activeNav === 'orders' && (
+          <div className="animate-slide-up">
+            <header className="content-header" style={{ marginBottom: '24px' }}>
+              <div>
+                <h1 className="page-title">My Orders</h1>
+                <p className="page-subtitle">Track your subscription orders, payment verification status, and manual gateway receipts.</p>
+              </div>
+
+              <div className="flex-align" style={{ gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={fetchUserOrders}
+                  className="btn btn-secondary"
+                  disabled={loadingOrders}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <RefreshCw size={14} className={loadingOrders ? "spinner-loader" : ""} />
+                  <span>Refresh</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onUpgradeClick('developer')}
+                  className="btn btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <ShoppingBag size={14} />
+                  <span>New Order / Upgrade</span>
+                </button>
+              </div>
+            </header>
+
+            {loadingOrders ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px' }}>
+                <RefreshCw size={28} className="spinner-loader" style={{ margin: '0 auto 16px', color: '#004ecc' }} />
+                <div style={{ color: '#94a3b8', fontSize: '14px', fontWeight: 600 }}>Loading your orders...</div>
+              </div>
+            ) : userOrders.length === 0 ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '90px 20px',
+                textAlign: 'center',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px dashed rgba(255, 255, 255, 0.12)',
+                borderRadius: '20px',
+                marginTop: '10px'
+              }}>
+                <div style={{
+                  width: '68px',
+                  height: '68px',
+                  borderRadius: '50%',
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  border: '1px solid rgba(56, 189, 248, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '18px',
+                  color: '#38bdf8'
+                }}>
+                  <ShoppingBag size={30} />
+                </div>
+                <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#ffffff', marginBottom: '8px' }}>
+                  No order found
+                </h3>
+                <p style={{ fontSize: '13.5px', color: '#94a3b8', maxWidth: '380px', lineHeight: 1.6, marginBottom: '22px' }}>
+                  You have not placed any subscription orders yet. Upgrade your plan to unlock elevated application and license capabilities.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onUpgradeClick('developer')}
+                  style={{
+                    padding: '11px 24px',
+                    borderRadius: '999px',
+                    background: '#004ecc',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '13.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 16px rgba(0, 78, 204, 0.35)'
+                  }}
+                >
+                  <span>Explore Pricing Plans</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            ) : (
+              <div className="table-responsive" style={{
+                background: '#11131a',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                overflow: 'hidden'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#94a3b8' }}>
+                      <th style={{ padding: '14px 18px', fontWeight: 700 }}>Order ID</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 700 }}>Plan</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 700 }}>Amount</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 700 }}>Method</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 700 }}>TrxID / Sender</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 700 }}>Status</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 700 }}>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userOrders.map((ord) => {
+                      const isPending = ord.status === 'pending';
+                      const isApproved = ord.status === 'approved';
+                      return (
+                        <tr key={ord.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                          <td style={{ padding: '14px 18px', fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>
+                            {ord.id.slice(0, 10)}...
+                          </td>
+                          <td style={{ padding: '14px 18px', fontWeight: 800, textTransform: 'uppercase', color: '#ffffff' }}>
+                            {ord.plan} ({ord.billing_cycle || 'monthly'})
+                          </td>
+                          <td style={{ padding: '14px 18px', fontWeight: 700, color: '#f8fafc' }}>
+                            {ord.amount_bdt ? `৳ ${ord.amount_bdt}` : `$ ${ord.amount_usd}`}
+                          </td>
+                          <td style={{ padding: '14px 18px', textTransform: 'uppercase', color: '#cbd5e1', fontWeight: 600 }}>
+                            {ord.payment_method}
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#ffffff' }}>{ord.txid}</div>
+                            {ord.sender_number && <div style={{ fontSize: '11px', color: '#94a3b8' }}>{ord.sender_number}</div>}
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '999px',
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                              background: isPending ? 'rgba(245, 158, 11, 0.12)' : isApproved ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                              color: isPending ? '#fbbf24' : isApproved ? '#34d399' : '#f87171',
+                              border: `1px solid ${isPending ? 'rgba(245, 158, 11, 0.3)' : isApproved ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                            }}>
+                              {isPending ? <Clock size={12} /> : isApproved ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                              {ord.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 18px', color: '#94a3b8', fontSize: '12px' }}>
+                            {ord.created_at ? new Date(ord.created_at * 1000).toLocaleDateString() : 'N/A'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

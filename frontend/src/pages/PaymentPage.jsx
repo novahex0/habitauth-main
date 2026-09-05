@@ -6,7 +6,8 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 
 export default function PaymentPage() {
-  const { language } = useLanguage();
+  const { currentLang, language, setLanguage } = useLanguage();
+  const lang = currentLang || language || 'bn';
   
   // Extract sessionId from path e.g. /payment/:sessionId
   const [sessionId, setSessionId] = useState(() => {
@@ -364,26 +365,72 @@ export default function PaymentPage() {
                 padding: '7px 12px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px',
                 fontSize: '12px', fontWeight: 700
               }}
-              title="Change Payment Method"
+              title={lang === 'bn' ? "পেমেন্ট মাধ্যম পরিবর্তন করুন" : "Change Payment Method"}
             >
               <ArrowLeft size={14} />
-              <span>Back</span>
+              <span>{lang === 'bn' ? 'ফিরে যান' : 'Back'}</span>
             </button>
           ) : (
             <div />
           )}
 
-          <button
-            type="button"
-            onClick={handleTriggerCancel}
-            style={{
-              background: '#f1f5f9', border: '1px solid #e2e8f0', cursor: 'pointer', color: '#94a3b8',
-              padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}
-            title="Cancel Invoice"
-          >
-            <X size={17} />
-          </button>
+          {/* Top Right: English / Bangla Switcher + Cancel (X) Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              display: 'inline-flex',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              borderRadius: '999px',
+              padding: '2px'
+            }}>
+              <button
+                type="button"
+                onClick={() => setLanguage('bn')}
+                style={{
+                  border: 'none',
+                  borderRadius: '999px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  background: lang === 'bn' ? '#004ecc' : 'transparent',
+                  color: lang === 'bn' ? '#ffffff' : '#64748b',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                বাংলা
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage('en')}
+                style={{
+                  border: 'none',
+                  borderRadius: '999px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  background: lang === 'en' ? '#004ecc' : 'transparent',
+                  color: lang === 'en' ? '#ffffff' : '#64748b',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                EN
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleTriggerCancel}
+              style={{
+                background: '#f1f5f9', border: '1px solid #e2e8f0', cursor: 'pointer', color: '#94a3b8',
+                padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+              title={lang === 'bn' ? "ইনভয়েস বাতিল করুন" : "Cancel Invoice"}
+            >
+              <X size={17} />
+            </button>
+          </div>
         </div>
 
         {/* Loading / Error States */}
@@ -604,7 +651,7 @@ export default function PaymentPage() {
                   transition: 'all 0.2s ease'
                 }}
               >
-                Mobile Banking
+                {lang === 'bn' ? 'মোবাইল ব্যাংকিং' : 'Mobile Banking'}
               </button>
 
               <button
@@ -619,7 +666,7 @@ export default function PaymentPage() {
                   transition: 'all 0.2s ease'
                 }}
               >
-                International
+                {lang === 'bn' ? 'আন্তর্জাতিক' : 'International'}
               </button>
             </div>
 
@@ -772,7 +819,7 @@ export default function PaymentPage() {
               onMouseEnter={(e) => { e.currentTarget.style.background = '#004ecc'; e.currentTarget.style.color = '#ffffff'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.color = '#1d4ed8'; }}
             >
-              <span>Pay {finalPrice} {currency}</span>
+              <span>{lang === 'bn' ? `পরবর্তী ধাপে যান (${finalPrice} ${currency})` : `Pay ${finalPrice} ${currency}`}</span>
             </button>
           </div>
         )}
@@ -843,10 +890,10 @@ export default function PaymentPage() {
             {/* Yellow advice bar from screenshot */}
             <div style={{
               background: '#fefce8', border: '1px solid #fef08a', borderRadius: '8px',
-              padding: '8px 12px', textAlign: 'center', fontSize: '11.5px', color: '#854d0e',
+              padding: '9px 12px', textAlign: 'center', fontSize: '12px', color: '#854d0e',
               fontWeight: 700, marginBottom: '14px'
             }}>
-              নোটঃ টাকা পাঠানোর ৫-১৫ সেকেন্ড পর ভেরিফাই করবেন।
+              {lang === 'bn' ? 'নোটঃ টাকা পাঠানোর ৫-১৫ সেকেন্ড পর ভেরিফাই করবেন।' : 'Note: Please verify 5-15 seconds after sending money.'}
             </div>
 
             {/* ── GATEWAY-THEMED CARD (MATCHING SCREENSHOT 1) ── */}
@@ -860,41 +907,46 @@ export default function PaymentPage() {
             }}>
               {/* Title */}
               <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 800, marginBottom: '12px' }}>
-                ট্রানজেকশন আইডি দিন
+                {lang === 'bn' ? 'ট্রানজেকশন আইডি দিন' : 'Enter Transaction ID'}
               </div>
 
-              {/* Large Input for TrxID */}
-              <div style={{ marginBottom: '16px' }}>
+              {/* Large Input for TrxID (Clean solid white fill matching screenshot) */}
+              <div style={{ marginBottom: '14px' }}>
                 <input
                   type="text"
                   value={trxId}
                   onChange={(e) => setTrxId(e.target.value.toUpperCase())}
-                  placeholder="ট্রানজেকশন আইডি দিন"
+                  placeholder={lang === 'bn' ? "ট্রানজেকশন আইডি দিন" : "Enter Transaction ID"}
                   style={{
                     width: '100%', boxSizing: 'border-box',
-                    padding: '13px 16px', borderRadius: '10px',
-                    border: 'none', fontSize: '14px', fontWeight: 800,
+                    height: '48px', padding: '12px 16px', borderRadius: '8px',
+                    border: 'none', fontSize: '15px', fontWeight: 800,
                     fontFamily: 'monospace', textAlign: 'center',
                     background: '#ffffff', color: '#0f172a',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    boxShadow: '0 3px 10px rgba(0,0,0,0.12)',
+                    outline: 'none'
                   }}
                   required
                 />
               </div>
 
-              {/* Sender mobile / ID input */}
+              {/* Sender mobile / ID input (Solid white fill) */}
               <div style={{ marginBottom: '16px' }}>
                 <input
                   type="text"
                   value={senderNumber}
                   onChange={(e) => setSenderNumber(e.target.value)}
-                  placeholder={activeTab === 'mobile_banking' ? "আপনার প্রেরক মোবাইল নম্বর লিখুন" : "আপনার Binance Pay ID / Wallet Address"}
+                  placeholder={activeTab === 'mobile_banking' 
+                    ? (lang === 'bn' ? "আপনার প্রেরক মোবাইল নম্বর লিখুন" : "Enter Sender Mobile Number") 
+                    : (lang === 'bn' ? "আপনার Binance Pay ID / Wallet Address" : "Your Binance Pay ID / Wallet Address")}
                   style={{
                     width: '100%', boxSizing: 'border-box',
-                    padding: '11px 16px', borderRadius: '10px',
-                    border: 'none', fontSize: '12.5px', fontWeight: 700,
+                    height: '44px', padding: '10px 16px', borderRadius: '8px',
+                    border: 'none', fontSize: '13px', fontWeight: 700,
                     fontFamily: 'monospace', textAlign: 'center',
-                    background: 'rgba(255, 255, 255, 0.95)', color: '#0f172a'
+                    background: '#ffffff', color: '#0f172a',
+                    boxShadow: '0 3px 10px rgba(0,0,0,0.12)',
+                    outline: 'none'
                   }}
                   required
                 />
@@ -903,7 +955,7 @@ export default function PaymentPage() {
               {/* Instructions Header with Show QR button */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '8px' }}>
                 <span style={{ fontSize: '11.5px', fontWeight: 800, letterSpacing: '0.5px' }}>
-                  INSTRUCTIONS
+                  {lang === 'bn' ? 'নির্দেশনাাবলী' : 'INSTRUCTIONS'}
                 </span>
 
                 <button
@@ -933,11 +985,11 @@ export default function PaymentPage() {
 
               {/* Instruction Bullet Points matching screenshot */}
               <div style={{ fontSize: '12px', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div>• {gatewayTheme.code} ডায়াল করে আপনার {gatewayTheme.name} মোবাইল মেনুতে যান অথবা {gatewayTheme.name} অ্যাপে যান</div>
-                <div>• "Send Money"-এ ক্লিক করুন।</div>
+                <div>• {lang === 'bn' ? `${gatewayTheme.code} ডায়াল করে আপনার ${gatewayTheme.name} মোবাইল মেনুতে যান অথবা ${gatewayTheme.name} অ্যাপে যান` : `Dial ${gatewayTheme.code} or open your ${gatewayTheme.name} mobile app`}</div>
+                <div>• {lang === 'bn' ? '"Send Money"-এ ক্লিক করুন।' : 'Select "Send Money".'}</div>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  <span>• প্রাপক নম্বর হিসাবে এই নম্বরটি লিখুন: <strong>{activeGateway.number || activeGateway.payId || activeGateway.address}</strong></span>
+                  <span>• {lang === 'bn' ? 'প্রাপক নম্বর হিসাবে এই নম্বরটি লিখুন:' : 'Enter recipient account number:'} <strong>{activeGateway.number || activeGateway.payId || activeGateway.address}</strong></span>
                   <button
                     type="button"
                     onClick={() => copyToClipboard(activeGateway.number || activeGateway.payId || activeGateway.address, 'boxNum')}
@@ -948,12 +1000,12 @@ export default function PaymentPage() {
                     }}
                   >
                     {copiedKey === 'boxNum' ? <Check size={10} /> : <Copy size={10} />}
-                    <span>{copiedKey === 'boxNum' ? 'Copied' : 'Copy'}</span>
+                    <span>{copiedKey === 'boxNum' ? (lang === 'bn' ? 'কপি হয়েছে' : 'Copied') : (lang === 'bn' ? 'কপি করুন' : 'Copy')}</span>
                   </button>
                 </div>
 
-                <div>• পরিমাণ: <strong>{finalPrice} {currency}</strong> দিয়ে SUBMIT করুন।</div>
-                <div>• সফল উত্তরের মেসেজের Transaction ID দিন এবং VERIFY করুন।</div>
+                <div>• {lang === 'bn' ? `পরিমাণ: ` : `Amount: `}<strong>{finalPrice} {currency}</strong> {lang === 'bn' ? 'দিয়ে SUBMIT করুন।' : 'and submit.'}</div>
+                <div>• {lang === 'bn' ? 'সফল মেসেজের Transaction ID ওপরের বক্সে দিন এবং VERIFY করুন।' : 'After transfer, paste Transaction ID above and click VERIFY.'}</div>
               </div>
             </div>
 
@@ -1038,10 +1090,10 @@ export default function PaymentPage() {
               {submitting ? (
                 <>
                   <RefreshCw size={16} className="spinner-loader" />
-                  <span>VERIFYING TRANSACTION...</span>
+                  <span>{lang === 'bn' ? 'ভেরিফাই হচ্ছে...' : 'VERIFYING TRANSACTION...'}</span>
                 </>
               ) : (
-                <span>VERIFY TRANSACTION</span>
+                <span>{lang === 'bn' ? 'VERIFY TRANSACTION / সাবমিট করুন' : 'VERIFY TRANSACTION'}</span>
               )}
             </button>
           </div>

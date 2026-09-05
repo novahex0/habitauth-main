@@ -68,7 +68,11 @@ export default function App() {
 
   const [bannedInfo, setBannedInfo] = useState({ isBanned: false, reason: '' });
 
-  const handleOpenLogin = (tab = 'signin') => {
+  const handleOpenLogin = (tab = 'signin', preservePending = false) => {
+    if (!preservePending) {
+      localStorage.removeItem('habit_pending_plan');
+      sessionStorage.removeItem('habit_pending_plan');
+    }
     setBannedInfo({ isBanned: false, reason: '' });
     setLoginModalTab(tab);
     setLoginModalOpen(true);
@@ -194,8 +198,10 @@ export default function App() {
                 localStorage.removeItem('habit_pending_plan');
                 sessionStorage.removeItem('habit_pending_plan');
                 const plan = JSON.parse(pending);
-                await proceedToCheckout(plan, tokenParam);
-                return;
+                if (plan && plan.fromOrderCard) {
+                  await proceedToCheckout(plan, tokenParam);
+                  return;
+                }
               }
             } catch (e) {
               console.error('Pending plan redirect error:', e);
@@ -240,9 +246,11 @@ export default function App() {
         localStorage.removeItem('habit_pending_plan');
         sessionStorage.removeItem('habit_pending_plan');
         const plan = JSON.parse(pending);
-        const token = localStorage.getItem('habit_token');
-        await proceedToCheckout(plan, token);
-        return;
+        if (plan && plan.fromOrderCard) {
+          const token = localStorage.getItem('habit_token');
+          await proceedToCheckout(plan, token);
+          return;
+        }
       }
     } catch (e) {
       console.error('Post-login checkout error:', e);
@@ -391,7 +399,11 @@ export default function App() {
           isOpen={loginModalOpen}
           initialTab={loginModalTab}
           initialBannedInfo={bannedInfo}
-          onClose={() => setLoginModalOpen(false)}
+          onClose={() => {
+          setLoginModalOpen(false);
+          localStorage.removeItem('habit_pending_plan');
+          sessionStorage.removeItem('habit_pending_plan');
+        }}
           onLoginSuccess={handleLoginSuccess}
         />
 
@@ -466,7 +478,11 @@ export default function App() {
         isOpen={loginModalOpen}
         initialTab={loginModalTab}
         initialBannedInfo={bannedInfo}
-        onClose={() => setLoginModalOpen(false)}
+        onClose={() => {
+          setLoginModalOpen(false);
+          localStorage.removeItem('habit_pending_plan');
+          sessionStorage.removeItem('habit_pending_plan');
+        }}
         onLoginSuccess={handleLoginSuccess}
       />
 
