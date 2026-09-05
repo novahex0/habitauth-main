@@ -127,14 +127,16 @@ export function clientInit(req, res) {
 
   const sessionNonce = nonce || uuidv4();
 
-  // Validate App Secret (if supplied by client SDK)
+  // Validate App Secret (Strict: Mandatory if app has app_secret configured)
   const client_secret = req.body.app_secret || req.body.appSecret || req.body.secret;
-  if (client_secret && app.app_secret && client_secret.trim() !== app.app_secret.trim()) {
-    return sendSignedResponse(res, 401, {
-      success: false,
-      code: 'SECRET_NOT_MATCH',
-      message: 'App Secret does not match! Please check your Application Secret in the dashboard.'
-    }, app, sessionNonce);
+  if (app.app_secret) {
+    if (!client_secret || client_secret.trim() !== app.app_secret.trim()) {
+      return sendSignedResponse(res, 401, {
+        success: false,
+        code: 'SECRET_NOT_MATCH',
+        message: 'App Secret does not match or is missing! Please provide the correct Application Secret.'
+      }, app, sessionNonce);
+    }
   }
 
   // Validate App Name (if supplied by client SDK and not default placeholder)
@@ -216,8 +218,8 @@ export function clientInit(req, res) {
   const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
   const appVersionClean = appVersionRaw.replace(/^v/i, '');
 
-  if (appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
-    recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw} while app requires v${appVersionRaw}`, extractClientIp(req));
+  if (appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
+    recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw || 'none'} while app requires v${appVersionRaw}`, extractClientIp(req));
     return sendSignedResponse(res, 426, {
       success: false,
       code: 'UPDATE_REQUIRED',
@@ -258,8 +260,8 @@ export async function clientLogin(req, res) {
   const app_id = req.body.app_id || req.body.appId;
   const username = req.body.username;
   const password = req.body.password;
-  const hwid = req.body.hwid;
-  const sid = req.body.sid;
+  const hwid = req.body.hwid || req.body.HWID || req.body.hw_id || req.body.hardware_id;
+  const sid = req.body.sid || req.body.SID;
   const nonce = req.body.nonce;
   const ip = extractClientIp(req);
 
@@ -282,6 +284,16 @@ export async function clientLogin(req, res) {
   const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
   if (!app) {
     return res.status(404).json({ success: false, message: 'Invalid Application ID.' });
+  }
+
+  // Validate App Secret (if configured on app and provided by client)
+  const client_secret = req.body.app_secret || req.body.appSecret || req.body.secret;
+  if (app.app_secret && client_secret && client_secret.trim() !== app.app_secret.trim()) {
+    return sendSignedResponse(res, 401, {
+      success: false,
+      code: 'SECRET_NOT_MATCH',
+      message: 'App Secret does not match!'
+    }, app, nonce);
   }
 
   // Check Developer Subscription Expiration (Strict Suspension)
@@ -313,7 +325,7 @@ export async function clientLogin(req, res) {
   const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
   const appVersionClean = appVersionRaw.replace(/^v/i, '');
 
-  if (appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
+  if (appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
     return sendSignedResponse(res, 426, {
       success: false,
       code: 'UPDATE_REQUIRED',
@@ -469,13 +481,17 @@ export async function clientLogin(req, res) {
     if (!user.hwid) {
       // First machine: Bind HWID automatically!
       db.prepare('UPDATE application_users SET hwid = ?, sid = ? WHERE id = ?').run(cleanHwid, cleanSid, user.id);
-      // Register Device
-      const devId = 'dev_' + uuidv4().slice(0, 10);
-      db.prepare(`
-        INSERT INTO devices (id, app_id, user_id, hwid, device_name, os, status, first_seen, last_seen)
-        VALUES (?, ?, ?, ?, 'Client Workstation', 'Windows', 'bound', ?, ?)
-      `).run(devId, app_id, user.id, cleanHwid, now, now);
       user.hwid = cleanHwid;
+      // Register Device
+      try {
+        const devId = 'dev_' + uuidv4().slice(0, 10);
+        db.prepare(`
+          INSERT OR REPLACE INTO devices (id, app_id, user_id, hwid, device_name, os, status, first_seen, last_seen)
+          VALUES (?, ?, ?, ?, 'Client Workstation', 'Windows', 'bound', ?, ?)
+        `).run(devId, app_id, user.id, cleanHwid, now, now);
+      } catch (e) {
+        console.error('Device bind error:', e);
+      }
     } else if (user.hwid !== cleanHwid) {
       recordAuditLog(app.user_id, app_id, 'HWID_MISMATCH', `User '${username}' rejected: HWID mismatch (expected ${user.hwid.slice(0, 10)}..., received ${cleanHwid.slice(0, 10)}...)`, ip);
       return sendSignedResponse(res, 403, {
@@ -486,8 +502,8 @@ export async function clientLogin(req, res) {
     }
   }
 
-  // Login successful: reset failed counters
-  db.prepare('UPDATE application_users SET failed_attempts = 0, locked_until = 0, last_login = ?, last_ip = ?, is_online = 1, last_heartbeat = ?, hwid = COALESCE(?, hwid) WHERE id = ?')
+  // Login successful: reset failed counters and ensure HWID & IP are saved
+  db.prepare('UPDATE application_users SET failed_attempts = 0, locked_until = 0, last_login = ?, last_ip = ?, is_online = 1, last_heartbeat = ?, hwid = COALESCE(hwid, ?) WHERE id = ?')
     .run(now, ip, now, cleanHwid, user.id);
 
   recordAuditLog(app.user_id, app_id, 'LOGIN_SUCCESS', `Client user '${username}' logged in successfully`, ip);
@@ -704,14 +720,24 @@ export async function clientRegister(req, res) {
     }, app, nonce);
   }
 
+  // Validate App Secret (if configured on app and provided by client)
+  const client_secret = req.body.app_secret || req.body.appSecret || req.body.secret;
+  if (app.app_secret && client_secret && client_secret.trim() !== app.app_secret.trim()) {
+    return sendSignedResponse(res, 401, {
+      success: false,
+      code: 'SECRET_NOT_MATCH',
+      message: 'App Secret does not match!'
+    }, app, nonce);
+  }
+
   // Application Version Check & Update Enforcement
   const clientVersionRaw = (req.body.client_version || req.body.clientVersion || req.body.version || '').trim();
   const appVersionRaw = (app.latest_version || app.version || '').trim();
   const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
   const appVersionClean = appVersionRaw.replace(/^v/i, '');
 
-  if (appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
-    recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw} while app requires v${appVersionRaw}`, ip);
+  if (appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
+    recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw || 'none'} while app requires v${appVersionRaw}`, ip);
     return sendSignedResponse(res, 426, {
       success: false,
       code: 'UPDATE_REQUIRED',
@@ -743,7 +769,7 @@ export async function clientRegister(req, res) {
     expiresAt = now + (lic.duration_days * 86400);
   }
 
-  const cleanHwid = hwid ? hwid.trim() : null;
+  const cleanHwid = (hwid || req.body.HWID || req.body.hw_id || req.body.hardware_id || '').trim() || null;
   const newUserId = 'appusr_' + uuidv4().slice(0, 12);
   const userToken = 'tok_' + uuidv4().replace(/-/g, '').slice(0, 24);
   const passwordHash = await bcrypt.hash(password, 10);
@@ -751,7 +777,19 @@ export async function clientRegister(req, res) {
   db.prepare(`
     INSERT INTO application_users (id, app_id, username, password_hash, token, license_key, hwid, status, expires_at, created_at, is_online, last_heartbeat, last_ip, last_login)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, 1, ?, ?, ?)
-  `).run(newUserId, app_id, username.trim(), passwordHash, userToken, lic.license_key, cleanHwid, expiresAt, now, now);
+  `).run(newUserId, app_id, username.trim(), passwordHash, userToken, lic.license_key, cleanHwid, expiresAt, now, now, ip, now);
+
+  if (cleanHwid) {
+    try {
+      const devId = 'dev_' + uuidv4().slice(0, 10);
+      db.prepare(`
+        INSERT OR REPLACE INTO devices (id, app_id, user_id, hwid, device_name, os, status, first_seen, last_seen)
+        VALUES (?, ?, ?, ?, 'Client Workstation', 'Windows', 'bound', ?, ?)
+      `).run(devId, app_id, newUserId, cleanHwid, now, now);
+    } catch (e) {
+      console.error('Device insert error on register:', e);
+    }
+  }
 
   db.prepare(`
     UPDATE licenses 

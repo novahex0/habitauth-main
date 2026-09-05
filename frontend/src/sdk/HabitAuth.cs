@@ -509,6 +509,22 @@ namespace HabitAuth
             _heartbeatRunning = false;
         }
 
+        /// <summary>
+        /// 7. Terminate current user session and reset state (Synchronous)
+        /// </summary>
+        public void logout()
+        {
+            Logout();
+        }
+
+        public void Logout()
+        {
+            StopHeartbeat();
+            User = new UserData();
+            SessionToken = null;
+            LastResponse = new ResponseData { Success = true, Message = "Logged out successfully." };
+        }
+
         #endregion
 
         #region Helpers & Cryptography

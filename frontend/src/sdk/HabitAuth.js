@@ -394,6 +394,14 @@ class HabitAuth {
     return true;
   }
 
+  get response() {
+    return this.lastResponse || { success: false, message: '' };
+  }
+
+  get user_data() {
+    return this.user || {};
+  }
+
   _checkInit() {
     if (!this.isInitialized) {
       throw new Error('[HabitAuth] You must call await auth.init() before invoking authentication methods.');
@@ -401,11 +409,21 @@ class HabitAuth {
   }
 }
 
+class api extends HabitAuth {
+  constructor({ name, ownerid, secret = '', version = '1.0', url = 'https://habitauth.onrender.com/api/v1' } = {}) {
+    super({ appName: name, appId: ownerid, appSecret: secret, version, baseUrl: url });
+  }
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = HabitAuth;
+  module.exports.HabitAuth = HabitAuth;
+  module.exports.api = api;
 }
 if (typeof window !== 'undefined') {
   window.HabitAuth = HabitAuth;
+  window.api = api;
 }
 
+export { api };
 export default HabitAuth;

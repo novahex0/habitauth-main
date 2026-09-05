@@ -5097,59 +5097,108 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
             </header>
 
             {/* Live Online Radar Telemetry Bar */}
-            <div 
-              className="glass-panel" 
-              style={{ 
-                padding: '16px 20px', 
-                marginBottom: '20px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                border: '1px solid rgba(34, 197, 94, 0.25)',
-                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.04) 0%, rgba(8, 6, 16, 0.9) 100%)'
-              }}
-            >
-              <div className="flex-align" style={{ gap: '12px' }}>
-                <div style={{ position: 'relative', width: '12px', height: '12px' }}>
-                  <span style={{ position: 'absolute', width: '12px', height: '12px', borderRadius: '50%', background: '#22c55e', opacity: 0.7, animation: 'pulse 2s infinite' }}></span>
-                  <span style={{ position: 'absolute', top: '2px', left: '2px', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></span>
-                </div>
-                <div>
-                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.3px' }}>
-                    LIVE ONLINE RADAR — {liveUsers.length} ACTIVE {liveUsers.length === 1 ? 'SESSION' : 'SESSIONS'}
-                  </span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>
-                    {liveUsers.length === 0 
-                      ? 'Radar Active • Listening for client heartbeats (0 desktop clients connected). When users run your software, they appear here live.' 
-                      : 'Real-time telemetry heartbeat (every 60s). Click "Kill" on any user to remotely terminate their session.'}
-                  </span>
-                </div>
-              </div>
-
-              {liveUsers.length > 0 && (
-                <div className="flex-align" style={{ gap: '8px', flexWrap: 'wrap' }}>
-                  {liveUsers.slice(0, 5).map(lu => (
-                    <span 
-                      key={lu.id} 
-                      className="badge" 
-                      style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                    >
-                      @{lu.username}
-                      <button 
-                        onClick={() => handleKillSession(lu.id, lu.username)}
-                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
-                        title={`Kill session for @${lu.username}`}
-                      >
-                        <Zap size={11} />
-                      </button>
+            {isFreePlan ? (
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  padding: '14px 20px', 
+                  marginBottom: '20px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(8, 6, 16, 0.9) 100%)'
+                }}
+              >
+                <div className="flex-align" style={{ gap: '12px' }}>
+                  <div style={{
+                    width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b'
+                  }}>
+                    <Crown size={16} fill="#f59e0b" />
+                  </div>
+                  <div>
+                    <div className="flex-align" style={{ gap: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.3px' }}>
+                        LIVE ONLINE RADAR — PREMIUM FEATURE
+                      </span>
+                      <span className="badge badge-warning" style={{ fontSize: '10px', padding: '2px 7px' }}>
+                        PRO
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>
+                      Real-time active session telemetry and instant kill are locked on the Free tier. Upgrade to Developer or Pro to monitor live sessions.
                     </span>
-                  ))}
-                  {liveUsers.length > 5 && (
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>+{liveUsers.length - 5} more</span>
-                  )}
+                  </div>
                 </div>
-              )}
-            </div>
+                <button 
+                  onClick={onUpgradeClick} 
+                  className="btn btn-primary" 
+                  style={{ 
+                    padding: '7px 14px', fontSize: '12px', fontWeight: 700,
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    boxShadow: '0 0 15px rgba(245, 158, 11, 0.3)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Crown size={13} fill="#ffffff" style={{ marginRight: '6px' }} /> Upgrade Plan
+                </button>
+              </div>
+            ) : (
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  padding: '16px 20px', 
+                  marginBottom: '20px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  border: '1px solid rgba(34, 197, 94, 0.25)',
+                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.04) 0%, rgba(8, 6, 16, 0.9) 100%)'
+                }}
+              >
+                <div className="flex-align" style={{ gap: '12px' }}>
+                  <div style={{ position: 'relative', width: '12px', height: '12px' }}>
+                    <span style={{ position: 'absolute', width: '12px', height: '12px', borderRadius: '50%', background: '#22c55e', opacity: 0.7, animation: 'pulse 2s infinite' }}></span>
+                    <span style={{ position: 'absolute', top: '2px', left: '2px', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.3px' }}>
+                      LIVE ONLINE RADAR — {liveUsers.length} ACTIVE {liveUsers.length === 1 ? 'SESSION' : 'SESSIONS'}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>
+                      {liveUsers.length === 0 
+                        ? 'Radar Active • Listening for client heartbeats (0 desktop clients connected). When users run your software, they appear here live.' 
+                        : 'Real-time telemetry heartbeat (every 60s). Click "Kill" on any user to remotely terminate their session.'}
+                    </span>
+                  </div>
+                </div>
+
+                {liveUsers.length > 0 && (
+                  <div className="flex-align" style={{ gap: '8px', flexWrap: 'wrap' }}>
+                    {liveUsers.slice(0, 5).map(lu => (
+                      <span 
+                        key={lu.id} 
+                        className="badge" 
+                        style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        @{lu.username}
+                        <button 
+                          onClick={() => handleKillSession(lu.id, lu.username)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                          title={`Kill session for @${lu.username}`}
+                        >
+                          <Zap size={11} />
+                        </button>
+                      </span>
+                    ))}
+                    {liveUsers.length > 5 && (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>+{liveUsers.length - 5} more</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Header Search & Filter Bar */}
             <div className="users-header-bar">
@@ -5329,28 +5378,50 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                         </button>
 
                         {/* Direct One-Click Blacklist HWID Button */}
-                        {u.hwid && (
-                          <button 
-                            className="user-action-btn delete" 
-                            onClick={() => handleQuickBlacklistHwid(u.hwid, u.username)} 
-                            title="Permanently Blacklist User's Hardware ID (HWID)"
-                            style={{ color: '#f87171', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)' }}
-                          >
-                            <Ban size={11} style={{ marginRight: '2px' }} /> Ban HWID
-                          </button>
-                        )}
+                        {u.hwid && (() => {
+                          const hwidBlacklistEntry = blacklists.find(b => b.type === 'hwid' && b.value === u.hwid);
+                          const isHwidBanned = !!hwidBlacklistEntry;
+                          return (
+                            <button 
+                              className={`user-action-btn ${isHwidBanned ? 'unban' : 'delete'}`} 
+                              onClick={() => isHwidBanned 
+                                ? handleRemoveBlacklist(hwidBlacklistEntry.id, hwidBlacklistEntry.value, 'hwid')
+                                : handleQuickBlacklistHwid(u.hwid, u.username)
+                              } 
+                              title={isHwidBanned ? "Unban User's HWID" : "Permanently Blacklist User's Hardware ID (HWID)"}
+                              style={{ 
+                                color: isHwidBanned ? '#4ade80' : '#f87171', 
+                                background: isHwidBanned ? 'rgba(74, 222, 128, 0.12)' : 'rgba(239, 68, 68, 0.12)', 
+                                border: `1px solid ${isHwidBanned ? 'rgba(74, 222, 128, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` 
+                              }}
+                            >
+                              <Ban size={11} style={{ marginRight: '2px' }} /> {isHwidBanned ? 'Unban HWID' : 'Ban HWID'}
+                            </button>
+                          );
+                        })()}
 
                         {/* Direct One-Click Blacklist IP Button */}
-                        {u.last_ip && (
-                          <button 
-                            className="user-action-btn" 
-                            onClick={() => handleQuickBlacklistIp(u.last_ip, u.username)} 
-                            title="Permanently Blacklist User's IP Address"
-                            style={{ color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)' }}
-                          >
-                            <Globe size={11} style={{ marginRight: '2px' }} /> Ban IP
-                          </button>
-                        )}
+                        {u.last_ip && (() => {
+                          const ipBlacklistEntry = blacklists.find(b => b.type === 'ip' && b.value === u.last_ip);
+                          const isIpBanned = !!ipBlacklistEntry;
+                          return (
+                            <button 
+                              className={`user-action-btn ${isIpBanned ? 'unban' : ''}`} 
+                              onClick={() => isIpBanned 
+                                ? handleRemoveBlacklist(ipBlacklistEntry.id, ipBlacklistEntry.value, 'ip')
+                                : handleQuickBlacklistIp(u.last_ip, u.username)
+                              } 
+                              title={isIpBanned ? "Unban User's IP Address" : "Permanently Blacklist User's IP Address"}
+                              style={{ 
+                                color: isIpBanned ? '#4ade80' : '#38bdf8', 
+                                background: isIpBanned ? 'rgba(74, 222, 128, 0.12)' : 'rgba(56, 189, 248, 0.12)', 
+                                border: `1px solid ${isIpBanned ? 'rgba(74, 222, 128, 0.3)' : 'rgba(56, 189, 248, 0.3)'}` 
+                              }}
+                            >
+                              <Globe size={11} style={{ marginRight: '2px' }} /> {isIpBanned ? 'Unban IP' : 'Ban IP'}
+                            </button>
+                          );
+                        })()}
 
                         <button className="user-action-btn delete" onClick={() => handleDeleteUser(u.id)} title="Delete user">
                           <Trash2 size={12} />
@@ -6092,29 +6163,47 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                                   </button>
                                 )}
 
-                                {/* Ban HWID */}
-                                {u.hwid && (
-                                  <button
-                                    onClick={() => handleQuickBlacklistHwid(u.hwid, u.username)}
-                                    className="icon-btn"
-                                    title="Permanently Blacklist HWID"
-                                    style={{ color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '5px' }}
-                                  >
-                                    <Ban size={13} />
-                                  </button>
-                                )}
+                                 {/* Ban HWID */}
+                                 {u.hwid && (() => {
+                                   const hwidEntry = blacklists.find(b => b.type === 'hwid' && b.value === u.hwid);
+                                   const isHwidBanned = !!hwidEntry;
+                                   return (
+                                     <button
+                                       onClick={() => isHwidBanned ? handleRemoveBlacklist(hwidEntry.id, hwidEntry.value, 'hwid') : handleQuickBlacklistHwid(u.hwid, u.username)}
+                                       className="icon-btn"
+                                       title={isHwidBanned ? "Unban HWID" : "Permanently Blacklist HWID"}
+                                       style={{ 
+                                         color: isHwidBanned ? '#4ade80' : '#f87171', 
+                                         background: isHwidBanned ? 'rgba(74, 222, 128, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
+                                         border: `1px solid ${isHwidBanned ? 'rgba(74, 222, 128, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`, 
+                                         padding: '5px' 
+                                       }}
+                                     >
+                                       <Ban size={13} />
+                                     </button>
+                                   );
+                                 })()}
 
-                                {/* Ban IP */}
-                                {u.last_ip && (
-                                  <button
-                                    onClick={() => handleQuickBlacklistIp(u.last_ip, u.username)}
-                                    className="icon-btn"
-                                    title="Permanently Blacklist IP"
-                                    style={{ color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '5px' }}
-                                  >
-                                    <Globe size={13} />
-                                  </button>
-                                )}
+                                 {/* Ban IP */}
+                                 {u.last_ip && (() => {
+                                   const ipEntry = blacklists.find(b => b.type === 'ip' && b.value === u.last_ip);
+                                   const isIpBanned = !!ipEntry;
+                                   return (
+                                     <button
+                                       onClick={() => isIpBanned ? handleRemoveBlacklist(ipEntry.id, ipEntry.value, 'ip') : handleQuickBlacklistIp(u.last_ip, u.username)}
+                                       className="icon-btn"
+                                       title={isIpBanned ? "Unban IP" : "Permanently Blacklist IP"}
+                                       style={{ 
+                                         color: isIpBanned ? '#4ade80' : '#38bdf8', 
+                                         background: isIpBanned ? 'rgba(74, 222, 128, 0.1)' : 'rgba(56, 189, 248, 0.1)', 
+                                         border: `1px solid ${isIpBanned ? 'rgba(74, 222, 128, 0.25)' : 'rgba(56, 189, 248, 0.25)'}`, 
+                                         padding: '5px' 
+                                       }}
+                                     >
+                                       <Globe size={13} />
+                                     </button>
+                                   );
+                                 })()}
 
                                 {/* View full modal */}
                                 <button

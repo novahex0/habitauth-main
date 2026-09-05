@@ -159,6 +159,22 @@ router.delete('/notifications/:notifId', authenticateUser, deleteNotification);
 // ── 6. PUBLIC CLIENT, SDK & SYSTEM API ────────────────────────
 router.get('/system/config', getSystemConfig); // Public maintenance & announcement banner
 router.get('/app/check-update/:appId', checkAppUpdate); // Auto-update check
+router.get('/app/info/:appId', getPublicAppInfo);
+
+// Direct Browser GET Request Protection: Return HTTP 405 Method Not Allowed
+const clientGetNotAllowed = (req, res) => {
+  return res.status(405).json({
+    success: false,
+    code: 'METHOD_NOT_ALLOWED',
+    message: 'Direct browser GET navigation not allowed. Only HTTP POST client SDK requests are accepted.'
+  });
+};
+
+router.get('/auth/client-*', clientGetNotAllowed);
+router.get('/auth/client/*', clientGetNotAllowed);
+router.get('/client/*', clientGetNotAllowed);
+router.get('/license/*', clientGetNotAllowed);
+
 router.post('/auth/client-init', clientInit); // Session initialization & anti-tamper handshake
 router.post('/client/init', clientInit);
 router.post('/auth/client-login', clientLogin); // Brute force & 24h lockout enforced!
@@ -176,7 +192,6 @@ router.post('/license/validate', validateLicense);
 router.post('/client/license/validate', validateLicense);
 router.post('/license/activate', activateLicense);
 router.post('/license/deactivate', deactivateLicense);
-router.get('/app/info/:appId', getPublicAppInfo);
 
 // ── 7. SUPER ADMIN ENDPOINTS ─────────────────────────────────
 router.get('/admin/stats', authenticateUser, requireAdmin, getAdminStats);

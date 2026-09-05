@@ -52,6 +52,26 @@ class HabitAuth:
         self._heartbeat_thread = None
         self._heartbeat_stop = threading.Event()
 
+    @property
+    def response(self):
+        class ResponseObject:
+            def __init__(self, data):
+                self.success = data.get("success", False)
+                self.message = data.get("message", "")
+                self.code = data.get("code", "")
+        return ResponseObject(self.last_response)
+
+    @property
+    def user_data(self):
+        class UserDataObject:
+            def __init__(self, data):
+                data = data or {}
+                self.username = data.get("username", "")
+                self.expires_at = data.get("expires_at", "")
+                self.hwid = data.get("hwid", "")
+                self.ip = data.get("ip", "")
+        return UserDataObject(self.user)
+
     def get_hwid(self):
         """Generate tamper-resistant machine hardware fingerprint"""
         try:
