@@ -907,18 +907,23 @@ export default function PaymentPage() {
               boxShadow: `0 10px 25px -5px ${gatewayTheme.primary}55`
             }}>
               {/* Title */}
+              {/* Title based on gateway */}
               <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 800, marginBottom: '12px' }}>
-                {lang === 'bn' ? 'ট্রানজেকশন আইডি দিন' : 'Enter Transaction ID'}
+                {(selectedMethod === 'binance_pay' || selectedMethod === 'binance')
+                  ? (lang === 'bn' ? 'Binance Order ID দিন' : 'Enter Binance Order ID')
+                  : (lang === 'bn' ? 'ট্রানজেকশন আইডি দিন' : 'Enter Transaction ID')}
               </div>
 
-              {/* Large Input for TrxID (Clean solid white fill matching screenshot) */}
+              {/* Large Input for TrxID / Order ID */}
               <div style={{ marginBottom: '14px' }}>
                 <input
                   type="text"
                   className="payment-white-input"
                   value={trxId}
                   onChange={(e) => setTrxId(e.target.value.toUpperCase())}
-                  placeholder={lang === 'bn' ? "ট্রানজেকশন আইডি দিন" : "Enter Transaction ID"}
+                  placeholder={(selectedMethod === 'binance_pay' || selectedMethod === 'binance')
+                    ? (lang === 'bn' ? "Binance Order ID (যেমন: 452654450400329728)" : "Binance Order ID (e.g. 452654450400329728)")
+                    : (lang === 'bn' ? "ট্রানজেকশন আইডি দিন" : "Enter Transaction ID")}
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     height: '48px', padding: '12px 16px', borderRadius: '8px',
@@ -955,28 +960,30 @@ export default function PaymentPage() {
                 />
               </div>
 
-              {/* Instructions Header with Show QR button */}
+              {/* Instructions Header with Show QR button (ONLY for crypto / Binance, NEVER for bKash / Nagad / Rocket) */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '8px' }}>
                 <span style={{ fontSize: '11.5px', fontWeight: 800, letterSpacing: '0.5px' }}>
                   {lang === 'bn' ? 'নির্দেশনাাবলী' : 'INSTRUCTIONS'}
                 </span>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveInfoModal(activeInfoModal === 'qr' ? null : 'qr')}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.25)', border: 'none', borderRadius: '6px',
-                    padding: '4px 10px', fontSize: '10.5px', fontWeight: 800, color: '#ffffff',
-                    cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px'
-                  }}
-                >
-                  <QrCode size={11} />
-                  <span>Show QR</span>
-                </button>
+                {(activeTab === 'crypto' || selectedMethod === 'binance_pay' || selectedMethod === 'binance' || selectedMethod === 'trc20' || selectedMethod === 'crypto') && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveInfoModal(activeInfoModal === 'qr' ? null : 'qr')}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.25)', border: 'none', borderRadius: '6px',
+                      padding: '4px 10px', fontSize: '10.5px', fontWeight: 800, color: '#ffffff',
+                      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                    }}
+                  >
+                    <QrCode size={11} />
+                    <span>Show QR</span>
+                  </button>
+                )}
               </div>
 
-              {/* QR Code Popup */}
-              {activeInfoModal === 'qr' && (
+              {/* QR Code Popup (Only for Crypto / Binance) */}
+              {activeInfoModal === 'qr' && (activeTab === 'crypto' || selectedMethod === 'binance_pay' || selectedMethod === 'binance' || selectedMethod === 'trc20' || selectedMethod === 'crypto') && (
                 <div style={{
                   background: '#ffffff', borderRadius: '10px', padding: '14px',
                   textAlign: 'center', color: '#0f172a', marginBottom: '14px'
@@ -1008,7 +1015,9 @@ export default function PaymentPage() {
                 </div>
 
                 <div>• {lang === 'bn' ? `পরিমাণ: ` : `Amount: `}<strong>{finalPrice} {currency}</strong> {lang === 'bn' ? 'দিয়ে SUBMIT করুন।' : 'and submit.'}</div>
-                <div>• {lang === 'bn' ? 'সফল মেসেজের Transaction ID ওপরের বক্সে দিন এবং VERIFY করুন।' : 'After transfer, paste Transaction ID above and click VERIFY.'}</div>
+                <div>• {(selectedMethod === 'binance_pay' || selectedMethod === 'binance')
+                  ? (lang === 'bn' ? 'সফল মেসেজের Order ID ওপরের বক্সে দিন এবং VERIFY করুন।' : 'After transfer, paste Binance Order ID above and click VERIFY.')
+                  : (lang === 'bn' ? 'সফল মেসেজের Transaction ID ওপরের বক্সে দিন এবং VERIFY করুন।' : 'After transfer, paste Transaction ID above and click VERIFY.')}</div>
               </div>
             </div>
 
@@ -1019,7 +1028,7 @@ export default function PaymentPage() {
                   type="text"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="কুপন কোড (যদি থাকে)"
+                  placeholder={lang === 'bn' ? "কুপন কোড (যদি থাকে)" : "Coupon Code (if any)"}
                   disabled={!!appliedCoupon}
                   style={{
                     flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1',
@@ -1032,7 +1041,7 @@ export default function PaymentPage() {
                     onClick={handleRemoveCoupon}
                     style={{ padding: '0 14px', borderRadius: '10px', background: '#fee2e2', color: '#ef4444', border: 'none', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
                   >
-                    Remove
+                    {lang === 'bn' ? 'মুছে ফেলুন' : 'Remove'}
                   </button>
                 ) : (
                   <button
@@ -1041,7 +1050,7 @@ export default function PaymentPage() {
                     disabled={validatingCoupon || !couponCode.trim()}
                     style={{ padding: '0 16px', borderRadius: '10px', background: '#004ecc', color: '#fff', border: 'none', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
                   >
-                    {validatingCoupon ? 'Checking...' : 'Apply'}
+                    {validatingCoupon ? (lang === 'bn' ? 'যাচাই হচ্ছে...' : 'Checking...') : (lang === 'bn' ? 'প্রয়োগ করুন' : 'Apply')}
                   </button>
                 )}
               </div>
@@ -1051,7 +1060,7 @@ export default function PaymentPage() {
               )}
               {appliedCoupon && (
                 <div style={{ fontSize: '11.5px', color: '#059669', marginTop: '6px', fontWeight: 700 }}>
-                  {appliedCoupon.discount_percent}% Discount Applied!
+                  {appliedCoupon.discount_percent}% {lang === 'bn' ? 'ছাড় কার্যকর হয়েছে!' : 'Discount Applied!'}
                 </div>
               )}
             </div>

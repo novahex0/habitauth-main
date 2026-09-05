@@ -568,9 +568,15 @@ export async function getUserOrders(req, res) {
       ORDER BY created_at DESC
     `).all(userId);
 
+    const formattedOrders = orders.map(ord => ({
+      ...ord,
+      amount_bdt: (ord.currency === 'BDT' || ord.currency === '৳') ? ord.amount : null,
+      amount_usd: (ord.currency !== 'BDT' && ord.currency !== '৳') ? ord.amount : null
+    }));
+
     return res.json({
       success: true,
-      orders
+      orders: formattedOrders
     });
   } catch (err) {
     console.error('[Get User Orders Error]:', err);
@@ -600,9 +606,15 @@ export async function getAdminOrders(req, res) {
       ORDER BY cp.created_at DESC
     `).all();
 
+    const formattedOrders = orders.map(ord => ({
+      ...ord,
+      amount_bdt: (ord.currency === 'BDT' || ord.currency === '৳') ? ord.amount : null,
+      amount_usd: (ord.currency !== 'BDT' && ord.currency !== '৳') ? ord.amount : null
+    }));
+
     return res.json({
       success: true,
-      orders
+      orders: formattedOrders
     });
   } catch (err) {
     console.error('[Get Admin Orders Error]:', err);

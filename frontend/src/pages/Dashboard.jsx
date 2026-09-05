@@ -4208,7 +4208,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               <div className="flex-align" style={{ gap: '12px' }}>
                 {isFreePlan && (
                   <button 
-                    onClick={onUpgradeClick}
+                    onClick={() => setShowPricingModal(true)}
                     className="btn btn-primary"
                     style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 0 20px rgba(245, 158, 11, 0.3)' }}
                   >
@@ -4533,7 +4533,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                             {ord.plan} ({ord.billing_cycle || 'monthly'})
                           </td>
                           <td style={{ padding: '14px 18px', fontWeight: 700, color: '#f8fafc' }}>
-                            {ord.amount_bdt ? `৳ ${ord.amount_bdt}` : `$ ${ord.amount_usd}`}
+                            {ord.amount_bdt ? `৳ ${ord.amount_bdt}` : (ord.currency === 'BDT' || ord.currency === '৳') ? `৳ ${ord.amount}` : `$ ${ord.amount_usd != null ? ord.amount_usd : (ord.amount != null ? ord.amount : '—')}`}
                           </td>
                           <td style={{ padding: '14px 18px', textTransform: 'uppercase', color: '#cbd5e1', fontWeight: 600 }}>
                             {ord.payment_method}
@@ -4559,6 +4559,21 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                               {isPending ? <Clock size={12} /> : isApproved ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                               {ord.status}
                             </span>
+                            {ord.status === 'rejected' && ord.admin_notes && (
+                              <div style={{
+                                marginTop: '6px',
+                                fontSize: '11.5px',
+                                color: '#f87171',
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                padding: '5px 8px',
+                                borderRadius: '6px',
+                                lineHeight: 1.4,
+                                maxWidth: '240px'
+                              }}>
+                                <span style={{ fontWeight: 800, color: '#fca5a5' }}>Reason:</span> {ord.admin_notes}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '14px 18px', color: '#94a3b8', fontSize: '12px' }}>
                             {ord.created_at ? new Date(ord.created_at * 1000).toLocaleDateString() : 'N/A'}
@@ -5132,7 +5147,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   </div>
                 </div>
                 <button 
-                  onClick={onUpgradeClick} 
+                  onClick={() => setShowPricingModal(true)} 
                   className="btn btn-primary" 
                   style={{ 
                     padding: '7px 14px', fontSize: '12px', fontWeight: 700,
@@ -5457,7 +5472,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   Free plan does not include real-time telemetry. Upgrade to the <strong>Developer Plan ($1.20/mo)</strong> or <strong>Pro Developer ($3.20/mo)</strong> to monitor live active client sessions in real-time, view interactive node telemetry, and remotely terminate unauthorized sessions.
                 </p>
                 <button 
-                  onClick={onUpgradeClick} 
+                  onClick={() => setShowPricingModal(true)} 
                   className="btn btn-primary" 
                   style={{ 
                     padding: '13px 28px', fontSize: '14px', fontWeight: 800,
@@ -5465,7 +5480,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                     boxShadow: '0 0 25px rgba(245, 158, 11, 0.4)'
                   }}
                 >
-                  <Crown size={16} fill="#ffffff" style={{ marginRight: '8px' }} /> Upgrade to Developer ($1.20/mo)
+                  <Crown size={16} fill="#ffffff" style={{ marginRight: '8px' }} /> Upgrade Plan
                 </button>
               </div>
             ) : (
@@ -7409,7 +7424,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   Free plan does not support team creation. Upgrade to the <strong>Developer Plan ($1.20/mo)</strong> or <strong>Pro Developer ($3.20/mo)</strong> to create teams, invite members, assign custom roles & permissions, and build software collaboratively.
                 </p>
                 <button 
-                  onClick={onUpgradeClick} 
+                  onClick={() => setShowPricingModal(true)} 
                   className="btn btn-primary" 
                   style={{ 
                     padding: '13px 28px', fontSize: '14px', fontWeight: 800,
@@ -7417,7 +7432,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                     boxShadow: '0 0 25px rgba(245, 158, 11, 0.4)'
                   }}
                 >
-                  <Sparkles size={16} style={{ marginRight: '8px' }} /> Upgrade to Developer ($1.20/mo)
+                  <Sparkles size={16} style={{ marginRight: '8px' }} /> Upgrade Plan
                 </button>
               </div>
             ) : !myTeam ? (
@@ -13665,6 +13680,213 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
           <span>Menu</span>
         </button>
       </nav>
+
+      {/* ── ADMIN REJECT PAYMENT ORDER MODAL ── */}
+      {rejectModalOpen && (
+        <div 
+          className="modal-overlay animate-fade-in"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100000,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => { if (!reviewingOrderId) setRejectModalOpen(false); }}
+        >
+          <div 
+            className="glass-panel animate-scale-in"
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+              background: '#0c0f17',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: '20px',
+              padding: '28px 24px',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(239, 68, 68, 0.15)',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => { if (!reviewingOrderId) setRejectModalOpen(false); }}
+              style={{
+                position: 'absolute',
+                top: '18px',
+                right: '18px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#94a3b8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={16} />
+            </button>
+
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444'
+              }}>
+                <XCircle size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+                  Reject Payment Order
+                </h3>
+                <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0 0' }}>
+                  Provide a specific reason so the client knows why it was rejected.
+                </p>
+              </div>
+            </div>
+
+            {/* Order Brief Information */}
+            {(() => {
+              const ord = adminOrders.find(o => o.id === rejectingOrderId);
+              return ord ? (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  marginBottom: '18px',
+                  fontSize: '12.5px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>Order ID:</span>
+                    <span style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>{ord.id.slice(0, 14)}...</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>User / Plan:</span>
+                    <span style={{ color: '#ffffff', fontWeight: 700 }}>{ord.username || 'User'} — {ord.plan?.toUpperCase()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>Method / TxID:</span>
+                    <span style={{ fontFamily: 'monospace', color: '#cbd5e1', fontWeight: 600 }}>{ord.payment_method?.toUpperCase()} • {ord.txid}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>Amount:</span>
+                    <span style={{ color: '#34d399', fontWeight: 800 }}>{ord.amount_bdt ? `৳ ${ord.amount_bdt}` : `$ ${ord.amount_usd || ord.amount}`}</span>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Quick Reason Suggestions */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                Quick Preset Reasons:
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {[
+                  'Invalid Transaction ID / Order ID',
+                  'Payment Not Received in Account',
+                  'Amount Mismatch / Underpaid',
+                  'Duplicate / Re-used Transaction ID'
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setRejectionReason(preset)}
+                    style={{
+                      padding: '4px 9px',
+                      borderRadius: '6px',
+                      background: rejectionReason === preset ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+                      border: `1px solid ${rejectionReason === preset ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'}`,
+                      color: rejectionReason === preset ? '#fca5a5' : '#94a3b8',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      fontWeight: 600
+                    }}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reason Textarea */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                Rejection Reason <span style={{ color: '#ef4444' }}>*</span> (shown directly to client)
+              </label>
+              <textarea
+                rows={3}
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="e.g. Transaction ID was not found in statement or payment amount did not match."
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#ffffff',
+                  fontSize: '12.5px',
+                  resize: 'none',
+                  outline: 'none',
+                  lineHeight: 1.5
+                }}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                disabled={reviewingOrderId === rejectingOrderId}
+                onClick={() => setRejectModalOpen(false)}
+                className="btn btn-secondary"
+                style={{ padding: '8px 16px', fontSize: '12.5px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={reviewingOrderId === rejectingOrderId || !rejectionReason.trim()}
+                onClick={() => handleReviewOrder(rejectingOrderId, 'reject', rejectionReason.trim())}
+                className="btn btn-danger"
+                style={{
+                  padding: '8px 18px',
+                  fontSize: '12.5px',
+                  fontWeight: 800,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {reviewingOrderId === rejectingOrderId ? <RefreshCw size={13} className="spinner-loader" /> : <XCircle size={14} />}
+                <span>Confirm Reject</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── PRICING PLANS MODAL (EXPLORE PRICING / NEW ORDER / UPGRADE) ── */}
       {showPricingModal && (
