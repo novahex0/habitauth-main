@@ -211,6 +211,9 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
     }
   };
 
+  // ── PRICING PLANS MODAL STATE ──
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [pricingModalCycle, setPricingModalCycle] = useState('monthly');
 
   // ── COUPON CODE SYSTEM (ADMIN) ──
   const [adminCoupons, setAdminCoupons] = useState([]);
@@ -3707,7 +3710,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   background: logRetention.warning_badge === '1' 
                     ? 'linear-gradient(135deg, #ef4444, #b91c1c)' 
                     : 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  color: '#fff',
+                                    color: '#fff',
                   boxShadow: logRetention.warning_badge === '1' 
                     ? '0 0 10px rgba(239,68,68,0.8)' 
                     : '0 0 8px rgba(245,158,11,0.7)',
@@ -3723,8 +3726,64 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
           {(user?.role === 'admin' || user?.role === 'owner') && (
             <>
               <div className="nav-section-label" style={{ color: 'var(--danger)' }}>{t('dashAdministration')}</div>
-              <li className={`nav-item ${activeNav === 'admin' ? 'active' : ''}`} onClick={() => setActiveNav('admin')} style={{ color: '#f87171' }}>
-                <ShieldAlert size={17} /> <span>{t('dashAdmin')}</span>
+              
+              {/* 1. Admin System */}
+              <li 
+                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'system' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin'); setAdminSubTab('system'); }} 
+                style={{ color: '#f87171' }}
+              >
+                <ShieldAlert size={17} /> <span>Admin System</span>
+              </li>
+
+              {/* 2. Payment Orders */}
+              <li 
+                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'orders' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin'); setAdminSubTab('orders'); fetchAdminOrders(); }} 
+                style={{ color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <CreditCard size={17} /> <span>Payment Orders</span>
+                </div>
+                {adminOrders.filter(o => o.status === 'pending').length > 0 && (
+                  <span style={{
+                    background: '#ef4444',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    fontSize: '10px',
+                    padding: '1px 7px',
+                    fontWeight: 900
+                  }}>
+                    {adminOrders.filter(o => o.status === 'pending').length}
+                  </span>
+                )}
+              </li>
+
+              {/* 3. Coupons */}
+              <li 
+                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'coupons' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin'); setAdminSubTab('coupons'); fetchAdminCoupons(); }} 
+                style={{ color: '#f59e0b' }}
+              >
+                <Zap size={17} /> <span>Coupons</span>
+              </li>
+
+              {/* 4. Billing & Settings */}
+              <li 
+                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'billing' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin'); setAdminSubTab('billing'); fetchPaymentSettings(); }} 
+                style={{ color: '#a855f7' }}
+              >
+                <Sliders size={17} /> <span>Billing & Settings</span>
+              </li>
+
+              {/* 5. Database Hub */}
+              <li 
+                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'database' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin'); setAdminSubTab('database'); fetchDatabaseStats(); }} 
+                style={{ color: '#10b981' }}
+              >
+                <Database size={17} /> <span>Database Hub</span>
               </li>
             </>
           )}
@@ -4360,7 +4419,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
                 <button
                   type="button"
-                  onClick={() => onUpgradeClick('developer')}
+                  onClick={() => setShowPricingModal(true)}
                   className="btn btn-primary"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                 >
@@ -4410,7 +4469,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                 </p>
                 <button
                   type="button"
-                  onClick={() => onUpgradeClick('developer')}
+                  onClick={() => setShowPricingModal(true)}
                   style={{
                     padding: '11px 24px',
                     borderRadius: '999px',
@@ -10368,19 +10427,19 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
                 {/* Orders Table */}
                 <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
-                  <div className="table-responsive">
-                    <table className="data-table">
+                  <div className="table-responsive" style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+                    <table className="data-table" style={{ width: '100%', minWidth: '1080px', borderCollapse: 'collapse', textAlign: 'left' }}>
                       <thead>
-                        <tr>
-                          <th>User / Email</th>
-                          <th>Plan & Billing</th>
-                          <th>Gateway</th>
-                          <th>Amount</th>
-                          <th>Sender Phone / ID</th>
-                          <th>Transaction ID (TrxID)</th>
-                          <th>Submitted</th>
-                          <th>Status</th>
-                          <th style={{ textAlign: 'right' }}>Admin Actions</th>
+                        <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '180px' }}>User / Email</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '140px' }}>Plan & Billing</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '120px' }}>Gateway</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '100px' }}>Amount</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '160px' }}>Sender Phone / ID</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '200px' }}>Transaction ID (TrxID)</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '160px' }}>Submitted</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '120px' }}>Status</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '170px', textAlign: 'right' }}>Admin Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -10741,16 +10800,16 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                       <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Auto-invalidates when timer reaches 0</span>
                     </div>
 
-                    <div className="table-responsive">
-                      <table className="data-table">
+                    <div className="table-responsive" style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+                      <table className="data-table" style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', textAlign: 'left' }}>
                         <thead>
-                          <tr>
-                            <th>Code</th>
-                            <th>Discount</th>
-                            <th>Timer / Expires</th>
-                            <th>Uses</th>
-                            <th>Status</th>
-                            <th style={{ textAlign: 'right' }}>Action</th>
+                          <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '150px' }}>Code</th>
+                            <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '110px' }}>Discount</th>
+                            <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '160px' }}>Timer / Expires</th>
+                            <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '100px' }}>Uses</th>
+                            <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '110px' }}>Status</th>
+                            <th style={{ padding: '14px 18px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '90px', textAlign: 'right' }}>Action</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -13417,6 +13476,373 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
           <span>Menu</span>
         </button>
       </nav>
+
+      {/* ── PRICING PLANS MODAL (EXPLORE PRICING / NEW ORDER / UPGRADE) ── */}
+      {showPricingModal && (
+        <div 
+          className="modal-overlay animate-fade-in"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(0, 0, 0, 0.84)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowPricingModal(false)}
+        >
+          <div 
+            className="animate-scale-in"
+            style={{
+              width: '100%',
+              maxWidth: '860px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              background: '#0c0f17',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '24px',
+              padding: '32px 28px',
+              boxShadow: '0 25px 70px rgba(0, 0, 0, 0.85)',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setShowPricingModal(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                width: '34px',
+                height: '34px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#94a3b8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+            >
+              <X size={18} />
+            </button>
+
+            {/* Modal Header */}
+            <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '5px 14px',
+                borderRadius: '999px',
+                background: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                color: '#38bdf8',
+                fontSize: '12px',
+                fontWeight: 800,
+                marginBottom: '12px'
+              }}>
+                <Sparkles size={13} />
+                <span>PLANS & PRICING</span>
+              </div>
+              <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.5px', marginBottom: '8px' }}>
+                Upgrade Your Habit Auth Plan
+              </h2>
+              <p style={{ fontSize: '13.5px', color: '#94a3b8', maxWidth: '520px', margin: '0 auto', lineHeight: 1.5 }}>
+                Choose the best tier for your security requirements. Instant delivery with bKash, Nagad, Rocket, Binance & Crypto.
+              </p>
+
+              {/* Billing Cycle Switcher */}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '999px',
+                padding: '4px',
+                marginTop: '20px',
+                gap: '4px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setPricingModalCycle('monthly')}
+                  style={{
+                    padding: '6px 18px',
+                    borderRadius: '999px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: pricingModalCycle === 'monthly' ? '#004ecc' : 'transparent',
+                    color: pricingModalCycle === 'monthly' ? '#ffffff' : '#94a3b8',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPricingModalCycle('yearly')}
+                  style={{
+                    padding: '6px 18px',
+                    borderRadius: '999px',
+                    border: 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: pricingModalCycle === 'yearly' ? '#004ecc' : 'transparent',
+                    color: pricingModalCycle === 'yearly' ? '#ffffff' : '#94a3b8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>Yearly</span>
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '1px 6px',
+                    borderRadius: '999px',
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    color: '#34d399',
+                    border: '1px solid rgba(16, 185, 129, 0.3)'
+                  }}>
+                    Save 17%
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* 2 Plan Cards Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '20px',
+              marginBottom: '24px'
+            }}>
+              {/* Card 1: Developer Plan */}
+              <div style={{
+                background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                borderRadius: '20px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.3)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                  <div>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      color: '#38bdf8',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px'
+                    }}>
+                      Developer
+                    </span>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', marginTop: '2px' }}>
+                      Standard
+                    </h3>
+                  </div>
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '3px 9px',
+                    borderRadius: '999px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    color: '#38bdf8',
+                    border: '1px solid rgba(56, 189, 248, 0.3)'
+                  }}>
+                    Most Popular
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '32px', fontWeight: 900, color: '#ffffff' }}>
+                    {pricingModalCycle === 'monthly' ? '$1.20' : '$12.00'}
+                  </span>
+                  <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                    {pricingModalCycle === 'monthly' ? '/ month' : '/ year'}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, marginBottom: '20px' }}>
+                  Everything you need to secure, license, and distribute your software.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px', flex: 1 }}>
+                  {[
+                    '100 Applications included',
+                    '10,000 Users & Licenses',
+                    'Instant HWID Lock & 1-Click Reset',
+                    '24/7 Discord Webhook Integrations',
+                    '24h Brute-Force Lockout Defense',
+                    'Telegram Bot Security Notifications',
+                    'Official C#, C++, Python, JS SDKs',
+                    'Standard community support'
+                  ].map((feat, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1' }}>
+                      <CheckCircle2 size={14} color="#38bdf8" style={{ flexShrink: 0 }} />
+                      <span>{feat}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPricingModal(false);
+                    onUpgradeClick('developer', pricingModalCycle);
+                  }}
+                  className="btn btn-primary"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 18px rgba(0, 78, 204, 0.4)'
+                  }}
+                >
+                  <span>Upgrade with Crypto / Pay</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+
+              {/* Card 2: Pro Developer Plan */}
+              <div style={{
+                background: 'linear-gradient(180deg, rgba(168, 85, 247, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%)',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
+                borderRadius: '20px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                boxShadow: '0 8px 30px rgba(168, 85, 247, 0.15)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                  <div>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      color: '#c084fc',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px'
+                    }}>
+                      Pro Developer
+                    </span>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', marginTop: '2px' }}>
+                      Commercial
+                    </h3>
+                  </div>
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '3px 9px',
+                    borderRadius: '999px',
+                    background: 'rgba(168, 85, 247, 0.18)',
+                    color: '#c084fc',
+                    border: '1px solid rgba(168, 85, 247, 0.35)'
+                  }}>
+                    Ultimate Power
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '32px', fontWeight: 900, color: '#ffffff' }}>
+                    {pricingModalCycle === 'monthly' ? '$3.20' : '$32.00'}
+                  </span>
+                  <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                    {pricingModalCycle === 'monthly' ? '/ month' : '/ year'}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, marginBottom: '20px' }}>
+                  Maximum scale, custom branding, and priority infrastructure for commercial software.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px', flex: 1 }}>
+                  {[
+                    '1,000 Applications included',
+                    '100,000 Users & Licenses',
+                    'Everything in Developer Plan',
+                    'Custom License Key Prefixes',
+                    '500+ Team Member Capacity',
+                    'Dedicated VIP Discord Role',
+                    'Telegram Bot Security Notifications',
+                    'Priority 24/7 VIP Support'
+                  ].map((feat, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#cbd5e1' }}>
+                      <CheckCircle2 size={14} color="#a855f7" style={{ flexShrink: 0 }} />
+                      <span>{feat}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPricingModal(false);
+                    onUpgradeClick('pro', pricingModalCycle);
+                  }}
+                  className="btn"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    boxShadow: '0 4px 18px rgba(124, 58, 237, 0.4)'
+                  }}
+                >
+                  <span>Get Pro Access</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Footer Note */}
+            <div style={{
+              textAlign: 'center',
+              paddingTop: '16px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontSize: '11.5px',
+              color: '#64748b'
+            }}>
+              <Shield size={13} color="#10b981" />
+              <span>Instant Binance / Web3 & Mobile Banking delivery • 0 KYC • Safe & Secure</span>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

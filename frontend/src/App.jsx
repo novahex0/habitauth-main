@@ -349,21 +349,23 @@ export default function App() {
           user={user}
           onLogout={handleLogout}
           onBackToLanding={() => handleNavigate('landing')}
-          onUpgradeClick={(targetPlan) => {
+          onUpgradeClick={(targetPlan, billingCycle = 'monthly') => {
             const isProTarget = targetPlan === 'pro' || (targetPlan !== 'developer' && user?.plan === 'developer');
             if (isProTarget) {
               handleSelectPlan({
                 id: 'pro',
                 name: 'PRO DEVELOPER',
-                price: '3.20',
-                billing: 'per month'
+                price: billingCycle === 'yearly' ? '32.00' : '3.20',
+                billing: billingCycle === 'yearly' ? 'per year' : 'per month',
+                billingCycle: billingCycle
               });
             } else {
               handleSelectPlan({
                 id: 'developer',
                 name: 'DEVELOPER',
-                price: '1.20',
-                billing: 'per month'
+                price: billingCycle === 'yearly' ? '12.00' : '1.20',
+                billing: billingCycle === 'yearly' ? 'per year' : 'per month',
+                billingCycle: billingCycle
               });
             }
           }}
