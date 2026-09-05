@@ -8,6 +8,7 @@ import PasswordResetModal from './components/PasswordResetModal';
 import Dashboard from './pages/Dashboard';
 import Documentation from './pages/Documentation';
 import SystemStatus from './pages/SystemStatus';
+import PaymentPage from './pages/PaymentPage';
 import SystemNoticeBanner from './components/SystemNoticeBanner';
 import Footer from './components/Footer';
 import AnimatedDarkWaves from './components/AnimatedDarkWaves';
@@ -27,6 +28,7 @@ export default function App() {
 
   const [currentView, setCurrentView] = useState(() => {
     const path = window.location.pathname.toLowerCase();
+    if (path.startsWith('/payment')) return 'payment';
     if (path.startsWith('/docs')) return 'docs';
     if (path.startsWith('/status')) return 'status';
 
@@ -208,9 +210,47 @@ export default function App() {
     window.history.pushState({}, '', '/');
   };
 
-  const handleSelectPlan = (plan) => {
-    setSelectedPlanForPurchase(plan);
-    setPurchaseModalOpen(true);
+    const handleSelectPlan = async (plan) => {
+    const token = localStorage.getItem('habit_token');
+    if (!token || !user) {
+      try {
+        sessionStorage.setItem('habit_pending_plan', JSON.stringify(plan));
+      } catch (e) {}
+      handleOpenLogin('signin');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/v1/payment/create-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          plan: plan.id,
+          billing_cycle: plan.billingCycle || 'monthly'
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.checkout_url) {
+        window.open(data.checkout_url, '_blank');
+        return;
+      }
+    } catch (err) {}
+
+    // Fallback: open in new tab with generated UUID if network glitch
+    const fallbackId = 'pay_' + Math.random().toString(36).substring(2, 12);
+    try {
+      localStorage.setItem('habit_payment_session_' + fallbackId, JSON.stringify({
+        id: fallbackId,
+        plan: plan.id,
+        billing_cycle: plan.billingCycle || 'monthly',
+        amount_bdt: plan.billingCycle === 'yearly' ? 1500 : 150,
+        amount_usd: plan.billingCycle === 'yearly' ? 12 : 1.2
+      }));
+    } catch (e) {}
+    window.open(`/payment/${fallbackId}?method=mobile_banking`, '_blank');
   };
 
   const handleUpgradeSuccess = (paymentResult) => {
@@ -264,6 +304,10 @@ export default function App() {
   };
 
   // IF USER IS IN DASHBOARD MODE: SHOW FULLSCREEN DEDICATED SIDEBAR DASHBOARD
+  if (currentView === 'payment') {
+    return <PaymentPage />;
+  }
+
   if (currentView === 'dashboard' && user) {
     return (
       <div style={{ height: '100vh', maxHeight: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'transparent' }} className="font-sans">

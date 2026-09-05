@@ -3307,7 +3307,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
   // 15-Day Unlocked Badge Logic:
   // Features unlocked by upgrading display an "UNLOCKED" badge for 15 days.
   // After 15 days, "UNLOCKED" text is hidden ("muche jabe") while subscription remains active.
-  // If subscription expires, feature locks and Crown (👑) icon reappears.
+  // If subscription expires, feature locks and Crown icon reappears.
   const nowTs = Math.floor(Date.now() / 1000);
   const subStartedAt = activeUser?.sub_started_at || 0;
   const isWithin15Days = !isExpired && (!subStartedAt || ((nowTs - subStartedAt) <= 15 * 86400));
@@ -3673,6 +3673,24 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
           </li>
           <li className={`nav-item ${activeNav === 'security' ? 'active' : ''}`} onClick={() => setActiveNav('security')}>
             <Lock size={17} /> <span>{t('dashSecurity')}</span>
+          </li>
+                    {/* User My Orders Tab */}
+          <li className={`nav-item ${activeNav === 'orders' ? 'active' : ''}`} onClick={() => { setActiveNav('orders'); fetchUserOrders(); }}>
+            <CreditCard size={17} /> <span>{language === 'bn' ? 'আমার অর্ডার' : 'My Orders'}</span>
+            {userOrders.filter(o => o.status === 'pending').length > 0 && (
+              <span 
+                className="badge badge-warning" 
+                style={{ 
+                  marginLeft: 'auto', 
+                  fontSize: '9.5px', 
+                  fontWeight: '800', 
+                  padding: '2px 7px', 
+                  borderRadius: '12px' 
+                }}
+              >
+                {userOrders.filter(o => o.status === 'pending').length} PENDING
+              </span>
+            )}
           </li>
           <li className={`nav-item ${activeNav === 'audit' ? 'active' : ''}`} onClick={() => setActiveNav('audit')}>
             <Clock size={17} /> <span>{t('dashAudit')}</span>
@@ -7247,16 +7265,16 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                               <span style={{ fontSize: '10px', padding: '3px 7px', borderRadius: '4px', background: perms.manage_users ? 'rgba(59, 130, 246,0.15)' : 'rgba(255,255,255,0.03)', color: perms.manage_users ? 'var(--primary-light)' : 'var(--text-muted)' }}>
-                                Users: {perms.manage_users ? '✓' : '✗'}
+                                Users: {perms.manage_users ? 'Yes' : 'No'}
                               </span>
                               <span style={{ fontSize: '10px', padding: '3px 7px', borderRadius: '4px', background: perms.manage_licenses ? 'rgba(59, 130, 246,0.15)' : 'rgba(255,255,255,0.03)', color: perms.manage_licenses ? 'var(--primary-light)' : 'var(--text-muted)' }}>
-                                Licenses: {perms.manage_licenses ? '✓' : '✗'}
+                                Licenses: {perms.manage_licenses ? 'Yes' : 'No'}
                               </span>
                               <span style={{ fontSize: '10px', padding: '3px 7px', borderRadius: '4px', background: perms.view_analytics ? 'rgba(59, 130, 246,0.15)' : 'rgba(255,255,255,0.03)', color: perms.view_analytics ? 'var(--primary-light)' : 'var(--text-muted)' }}>
-                                Analytics: {perms.view_analytics ? '✓' : '✗'}
+                                Analytics: {perms.view_analytics ? 'Yes' : 'No'}
                               </span>
                               <span style={{ fontSize: '10px', padding: '3px 7px', borderRadius: '4px', background: perms.manage_webhooks ? 'rgba(59, 130, 246,0.15)' : 'rgba(255,255,255,0.03)', color: perms.manage_webhooks ? 'var(--primary-light)' : 'var(--text-muted)' }}>
-                                Webhooks: {perms.manage_webhooks ? '✓' : '✗'}
+                                Webhooks: {perms.manage_webhooks ? 'Yes' : 'No'}
                               </span>
                             </div>
                           </div>
@@ -9040,10 +9058,10 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                           value={broadcastType}
                           onChange={(e) => setBroadcastType(e.target.value)}
                         >
-                          <option value="info">📢 Information / System Announcement</option>
-                          <option value="security">🛡️ Security Alert / Vulnerability Notice</option>
-                          <option value="warning">⚠️ Warning / Maintenance Notice</option>
-                          <option value="danger">🚨 Critical Danger / Emergency Alert</option>
+                          <option value="info">Information / System Announcement</option>
+                          <option value="security">Security Alert / Vulnerability Notice</option>
+                          <option value="warning">Warning / Maintenance Notice</option>
+                          <option value="danger">Critical Danger / Emergency Alert</option>
                         </select>
                       </div>
 
@@ -10149,9 +10167,9 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                           className={`btn ${adminOrderFilter === f ? 'btn-primary' : 'btn-secondary'}`}
                           style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700, textTransform: 'capitalize' }}
                         >
-                          {f === 'pending' ? `⏳ Pending (${adminOrders.filter(o => o.status === 'pending').length})` :
-                           f === 'approved' ? `✓ Approved (${adminOrders.filter(o => o.status === 'approved' || o.status === 'completed').length})` :
-                           f === 'rejected' ? `✗ Rejected (${adminOrders.filter(o => o.status === 'rejected').length})` :
+                          {f === 'pending' ? `Pending (${adminOrders.filter(o => o.status === 'pending').length})` :
+                           f === 'approved' ? `Approved (${adminOrders.filter(o => o.status === 'approved' || o.status === 'completed').length})` :
+                           f === 'rejected' ? `Rejected (${adminOrders.filter(o => o.status === 'rejected').length})` :
                            `All (${adminOrders.length})`}
                         </button>
                       ))}
@@ -10463,13 +10481,13 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                         {/* Quick Presets */}
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
                           {[
-                            { label: '⚡ 30s Flash', val: 30, unit: 'seconds' },
-                            { label: '⏳ 10m', val: 10, unit: 'minutes' },
-                            { label: '🕒 1 Hour', val: 1, unit: 'hours' },
-                            { label: '📅 1 Day', val: 1, unit: 'days' },
-                            { label: '🚀 7 Days', val: 7, unit: 'days' },
-                            { label: '🗓️ 1 Month', val: 1, unit: 'months' },
-                            { label: '♾️ Unlimited', val: 0, unit: 'unlimited' }
+                            { label: '30s Flash', val: 30, unit: 'seconds' },
+                            { label: '10m', val: 10, unit: 'minutes' },
+                            { label: '1 Hour', val: 1, unit: 'hours' },
+                            { label: '1 Day', val: 1, unit: 'days' },
+                            { label: '7 Days', val: 7, unit: 'days' },
+                            { label: '1 Month', val: 1, unit: 'months' },
+                            { label: 'Unlimited', val: 0, unit: 'unlimited' }
                           ].map((p, idx) => {
                             const isSelected = newCouponDurationUnit === p.unit && (p.unit === 'unlimited' || newCouponDurationVal === p.val);
                             return (
@@ -10577,7 +10595,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                             const isMaxed = cpn.max_uses > 0 && cpn.used_count >= cpn.max_uses;
                             const diffSec = cpn.expires_at ? Math.max(0, cpn.expires_at - now) : null;
 
-                            let timerDisplay = '♾️ Unlimited';
+                            let timerDisplay = 'Unlimited';
                             if (cpn.expires_at) {
                               if (diffSec <= 0) {
                                 timerDisplay = 'EXPIRED';
@@ -11592,7 +11610,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   <option value="7">7 Days</option>
                   <option value="30">30 Days</option>
                   <option value="365">365 Days (1 Year)</option>
-                  <option value="custom">⚡ Custom Duration (Enter Days)</option>
+                  <option value="custom">Custom Duration (Enter Days)</option>
                 </select>
               </div>
 

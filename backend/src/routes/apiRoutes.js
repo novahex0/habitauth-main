@@ -53,6 +53,7 @@ import {
   getPaymentConfig, submitPaymentOrder, getUserOrders, getAdminOrders, reviewOrder,
   validateCoupon, getAdminCoupons, createCoupon, deleteCoupon,
   getPaymentSettings, updatePaymentSettings, testDiscordWebhook,
+  createPaymentSession, getPaymentSession,
   getPaymentConfig as getCryptoConfig, submitPaymentOrder as verifyCryptoPayment
 } from '../controllers/paymentController.js';
 
@@ -251,6 +252,8 @@ router.get('/audit-logs/export', authenticateUser, exportAuditLogsBackup);
 
 // ── 11. MULTI-GATEWAY PAYMENTS, ORDERS & COUPONS ──
 router.get('/payment/config', getPaymentConfig);
+router.post('/payment/create-session', authenticateUser, createPaymentSession);
+router.get('/payment/session/:sessionId', getPaymentSession);
 router.post('/payment/validate-coupon', validateCoupon);
 router.post('/payment/submit-order', authenticateUser, submitPaymentOrder);
 router.post('/payment/verify-crypto', authenticateUser, submitPaymentOrder);

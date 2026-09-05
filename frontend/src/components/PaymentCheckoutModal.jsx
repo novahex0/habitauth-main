@@ -557,7 +557,7 @@ export default function PaymentCheckoutModal({
                           {currentGateway.priceDisplay}
                         </span>
                         <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 800 }}>
-                          🔥 {appliedCoupon.discount_percent}% DISCOUNT APPLIED
+                          {appliedCoupon.discount_percent}% DISCOUNT APPLIED
                         </div>
                       </div>
                     ) : (

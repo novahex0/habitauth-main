@@ -311,6 +311,20 @@ export function initDatabase() {
       FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
     );
 
+    -- 21. Secure Hosted Payment Sessions
+    CREATE TABLE IF NOT EXISTS payment_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      plan TEXT NOT NULL,
+      billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+      amount_usd REAL NOT NULL,
+      amount_bdt INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active', -- 'active' | 'completed' | 'expired'
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
+    );
+
     -- Performance Indexes
     CREATE INDEX IF NOT EXISTS idx_accounts_discord ON accounts(discord_id);
     CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_id);
@@ -326,6 +340,7 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_crypto_payments_user ON crypto_payments(user_id);
     CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
     CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_user ON coupon_redemptions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_sessions_user ON payment_sessions(user_id);
   `);
 
   // Auto-migrate new columns if existing SQLite DB was already created
@@ -369,6 +384,23 @@ export function initDatabase() {
   try { db.exec("ALTER TABLE crypto_payments ADD COLUMN discount_percent INTEGER DEFAULT 0;"); } catch (e) {}
   try { db.exec("ALTER TABLE crypto_payments ADD COLUMN original_amount REAL DEFAULT 0;"); } catch (e) {}
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_crypto_payments_status ON crypto_payments(status);"); } catch (e) {}
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS payment_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        plan TEXT NOT NULL,
+        billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+        amount_usd REAL NOT NULL,
+        amount_bdt INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_payment_sessions_user ON payment_sessions(user_id);
+    `);
+  } catch (e) {}
 
   // Auto-sync team capacity to 500 for Pro and Admin accounts
   try {

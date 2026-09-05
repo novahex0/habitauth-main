@@ -118,6 +118,92 @@ export async function getPaymentConfig(req, res) {
  * POST /api/v1/payment/validate-coupon
  * Validates a coupon code, checking expiration and usage limits, and calculates discounted prices
  */
+
+/**
+ * POST /api/v1/payment/create-session
+ * Creates a secure hosted payment session with unique UUID token
+ */
+export async function createPaymentSession(req, res) {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Please log in to initiate checkout.' });
+    }
+
+    const { plan = 'developer', billing_cycle = 'monthly' } = req.body;
+    const { prices } = getDynamicGatewayConfig();
+
+    const planPrices = prices[plan] || prices.developer;
+    const cyclePrices = planPrices[billing_cycle] || planPrices.monthly;
+
+    const sessionId = uuidv4();
+    const now = Math.floor(Date.now() / 1000);
+    const expiresAt = now + 7200; // 2 hours validity
+
+    db.prepare(`
+      INSERT INTO payment_sessions (id, user_id, plan, billing_cycle, amount_usd, amount_bdt, status, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
+    `).run(sessionId, user.id, plan, billing_cycle, cyclePrices.usd, cyclePrices.bdt, now, expiresAt);
+
+    return res.json({
+      success: true,
+      session_id: sessionId,
+      checkout_url: `/payment/${sessionId}?method=mobile_banking`
+    });
+  } catch (err) {
+    console.error('[Create Payment Session Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to create payment session.' });
+  }
+}
+
+/**
+ * GET /api/v1/payment/session/:sessionId
+ * Retrieves hosted checkout session details
+ */
+export async function getPaymentSession(req, res) {
+  try {
+    const { sessionId } = req.params;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, message: 'Session ID required.' });
+    }
+
+    const session = db.prepare('SELECT * FROM payment_sessions WHERE id = ?').get(sessionId);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Payment session not found or invalid.' });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (session.expires_at < now) {
+      return res.status(410).json({ success: false, message: 'This payment session has expired. Please initiate a new purchase.' });
+    }
+
+    const account = db.prepare('SELECT id, username, email FROM accounts WHERE id = ?').get(session.user_id) || {};
+    const { gateways, prices } = getDynamicGatewayConfig();
+
+    return res.json({
+      success: true,
+      session: {
+        id: session.id,
+        user_id: session.user_id,
+        username: account.username || 'User',
+        email: account.email || '',
+        plan: session.plan,
+        plan_name: session.plan === 'pro' ? 'Pro Developer' : 'Developer',
+        billing_cycle: session.billing_cycle,
+        amount_usd: session.amount_usd,
+        amount_bdt: session.amount_bdt,
+        status: session.status,
+        created_at: session.created_at,
+        expires_at: session.expires_at
+      },
+      gateways
+    });
+  } catch (err) {
+    console.error('[Get Payment Session Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve payment session.' });
+  }
+}
+
 export async function validateCoupon(req, res) {
   try {
     const { code, plan = 'developer', billing_cycle = 'monthly' } = req.body;
@@ -386,20 +472,20 @@ export async function submitPaymentOrder(req, res) {
       
       if (discordWebhook && discordWebhook.startsWith('https://')) {
         const fields = [
-          { name: '👤 Username', value: userRecord?.username || 'Unknown', inline: true },
-          { name: '📧 Email', value: userRecord?.email || 'Unknown', inline: true },
-          { name: '📦 Selected Plan', value: `${plan.toUpperCase()} (${billing_cycle})`, inline: true },
-          { name: '💳 Gateway', value: `${gateway.name} (${gateway.accountType || ''})`, inline: true },
-          { name: '💰 Final Amount', value: `**${currency === 'BDT' ? '৳' : '$'}${finalAmount} ${currency}**`, inline: true },
-          { name: '📱 Sender Info', value: `\`${cleanSender}\``, inline: true },
-          { name: '🧾 TrxID / TxID', value: `\`${cleanTxId}\``, inline: false },
-          { name: '🆔 Order ID', value: `\`${orderId}\``, inline: true },
-          { name: '🕒 Status', value: '⏳ **PENDING ADMIN REVIEW**', inline: true }
+          { name: 'Username', value: userRecord?.username || 'Unknown', inline: true },
+          { name: 'Email', value: userRecord?.email || 'Unknown', inline: true },
+          { name: 'Selected Plan', value: `${plan.toUpperCase()} (${billing_cycle})`, inline: true },
+          { name: 'Gateway', value: `${gateway.name} (${gateway.accountType || ''})`, inline: true },
+          { name: 'Final Amount', value: `**${currency === 'BDT' ? '৳' : '$'}${finalAmount} ${currency}**`, inline: true },
+          { name: 'Sender Info', value: `\`${cleanSender}\``, inline: true },
+          { name: 'Transaction ID', value: `\`${cleanTxId}\``, inline: false },
+          { name: 'Order ID', value: `\`${orderId}\``, inline: true },
+          { name: 'Status', value: '**PENDING ADMIN REVIEW**', inline: true }
         ];
 
         if (appliedCoupon) {
           fields.splice(5, 0, {
-            name: '🎫 Coupon Applied',
+            name: 'Coupon Applied',
             value: `\`${appliedCoupon.code}\` (${discountPercent}% OFF) • Orig: ${currency === 'BDT' ? '৳' : '$'}${originalAmount}`,
             inline: false
           });
@@ -410,7 +496,7 @@ export async function submitPaymentOrder(req, res) {
           avatar_url: 'https://habitauth.onrender.com/assets/logo.png',
           embeds: [
             {
-              title: `⏳ New Payment Order: ${gateway.name}`,
+              title: `New Payment Order: ${gateway.name}`,
               description: `A user has submitted a new payment order awaiting admin review and plan release.`,
               color: 0xf59e0b,
               fields,
@@ -586,7 +672,7 @@ export async function reviewOrder(req, res) {
         `).run(
           notifId,
           order.user_id,
-          '🎉 Subscription Activated!',
+          'Subscription Activated!',
           `Your payment order (${order.txid}) for ${order.plan.toUpperCase()} Plan has been approved by admin! All premium developer features and hardware licenses are now unlocked.`,
           now
         );
@@ -603,15 +689,15 @@ export async function reviewOrder(req, res) {
               username: 'Habit Auth Payment Alert',
               avatar_url: 'https://habitauth.onrender.com/assets/logo.png',
               embeds: [{
-                title: '✅ Payment Order APPROVED & Subscription Activated',
+                title: 'Payment Order APPROVED & Subscription Activated',
                 description: `Admin **${adminUser.username}** approved order \`${id}\`. User has been upgraded to **${order.plan.toUpperCase()}** plan.`,
                 color: 0x10b981,
                 fields: [
-                  { name: '🆔 Order ID', value: `\`${id}\``, inline: true },
-                  { name: '📦 Plan', value: `${order.plan.toUpperCase()} (${order.billing_cycle})`, inline: true },
-                  { name: '💳 Gateway', value: `${order.payment_method.toUpperCase()}`, inline: true },
-                  { name: '🧾 TrxID', value: `\`${order.txid}\``, inline: false },
-                  { name: '📝 Admin Notes', value: admin_notes || 'Approved & Released', inline: false }
+                  { name: 'Order ID', value: `\`${id}\``, inline: true },
+                  { name: 'Plan', value: `${order.plan.toUpperCase()} (${order.billing_cycle})`, inline: true },
+                  { name: 'Gateway', value: `${order.payment_method.toUpperCase()}`, inline: true },
+                  { name: 'Transaction ID', value: `\`${order.txid}\``, inline: false },
+                  { name: 'Admin Notes', value: admin_notes || 'Approved & Released', inline: false }
                 ],
                 timestamp: new Date().toISOString()
               }]
@@ -643,7 +729,7 @@ export async function reviewOrder(req, res) {
         `).run(
           notifId,
           order.user_id,
-          '❌ Order Rejected',
+          'Order Rejected',
           `Your payment order (${order.txid}) was rejected by admin. Reason: ${admin_notes || 'Payment could not be verified in statements.'}`,
           now
         );
@@ -952,7 +1038,7 @@ export async function testDiscordWebhook(req, res) {
         username: 'Habit Auth Billing Test',
         avatar_url: 'https://habitauth.onrender.com/assets/logo.png',
         embeds: [{
-          title: '🔔 Discord Webhook Test Successful',
+          title: 'Discord Webhook Test Successful',
           description: `Test alert triggered by admin **${user.username}**. Your payment notification webhook is active and functioning properly!`,
           color: 0x38bdf8,
           timestamp: new Date().toISOString()
