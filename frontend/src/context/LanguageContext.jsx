@@ -822,13 +822,13 @@ const translations = {
 };
 
 export const AVAILABLE_LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇬🇧', label: 'EN' },
-  { code: 'bn', name: 'বাংলা (Bengali)', flag: '🇧🇩', label: 'BN' },
-  { code: 'es', name: 'Español', flag: '🇪🇸', label: 'ES' },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪', label: 'DE' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷', label: 'FR' },
-  { code: 'ru', name: 'Русский', flag: '🇷🇺', label: 'RU' },
-  { code: 'zh', name: '中文 (Chinese)', flag: '🇨🇳', label: 'ZH' },
+  { code: 'en', name: 'English', flag: 'EN', label: 'EN' },
+  { code: 'bn', name: 'বাংলা (Bengali)', flag: 'BN', label: 'BN' },
+  { code: 'es', name: 'Español', flag: 'ES', label: 'ES' },
+  { code: 'de', name: 'Deutsch', flag: 'DE', label: 'DE' },
+  { code: 'fr', name: 'Français', flag: 'FR', label: 'FR' },
+  { code: 'ru', name: 'Русский', flag: 'RU', label: 'RU' },
+  { code: 'zh', name: '中文 (Chinese)', flag: 'ZH', label: 'ZH' },
 ];
 
 export const TYPEWRITER_WORDS = {
