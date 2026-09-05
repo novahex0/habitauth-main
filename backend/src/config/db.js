@@ -24,6 +24,12 @@ export function initDatabase() {
       email TEXT,
       avatar TEXT,
       role TEXT DEFAULT 'user', -- 'user' | 'admin'
+      status TEXT DEFAULT 'active',
+      ban_reason TEXT,
+      password_hash TEXT,
+      reset_token TEXT,
+      reset_token_expires INTEGER DEFAULT 0,
+      log_cycle_start INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -62,7 +68,26 @@ export function initDatabase() {
       user_id TEXT NOT NULL,
       app_name TEXT NOT NULL,
       app_secret TEXT NOT NULL,
+      public_key TEXT DEFAULT '',
+      private_key TEXT DEFAULT '',
       version TEXT DEFAULT '1.0.0',
+      latest_version TEXT DEFAULT '1.0.0',
+      download_url TEXT DEFAULT '',
+      changelog TEXT DEFAULT '',
+      force_update_enabled INTEGER DEFAULT 0,
+      update_download_url TEXT DEFAULT '',
+      enforce_hash_check INTEGER DEFAULT 0,
+      expected_hash TEXT DEFAULT '',
+      auto_ban_on_hash_mismatch INTEGER DEFAULT 1,
+      custom_key_mask TEXT DEFAULT '',
+      hwid_cooldown_days INTEGER DEFAULT 7,
+      hwid_self_reset_enabled INTEGER DEFAULT 1,
+      custom_webhook_username TEXT DEFAULT '',
+      custom_webhook_avatar TEXT DEFAULT '',
+      custom_webhook_color TEXT DEFAULT '',
+      subscriptions_frozen INTEGER DEFAULT 0,
+      frozen_at INTEGER DEFAULT 0,
+      token_validation_enabled INTEGER DEFAULT 0,
       status TEXT DEFAULT 'active', -- 'active' | 'paused'
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -75,13 +100,19 @@ export function initDatabase() {
       app_id TEXT NOT NULL,
       username TEXT NOT NULL,
       password_hash TEXT NOT NULL,
+      token TEXT,
       license_key TEXT,
       hwid TEXT,
       sid TEXT,
       status TEXT DEFAULT 'active', -- 'active' | 'banned' | 'locked'
+      ban_reason TEXT,
       failed_attempts INTEGER DEFAULT 0,
       locked_until INTEGER DEFAULT 0, -- Timestamp. If > now, account is locked for 24h
       expires_at INTEGER DEFAULT 0, -- 0 = lifetime
+      is_online INTEGER DEFAULT 0,
+      last_heartbeat INTEGER DEFAULT 0,
+      session_killed INTEGER DEFAULT 0,
+      last_hwid_reset INTEGER DEFAULT 0,
       last_ip TEXT,
       last_login INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -94,6 +125,7 @@ export function initDatabase() {
       id TEXT PRIMARY KEY,
       app_id TEXT NOT NULL,
       license_key TEXT UNIQUE NOT NULL,
+      token TEXT,
       status TEXT DEFAULT 'unused', -- 'unused' | 'active' | 'expired' | 'revoked' | 'suspended'
       duration_days INTEGER DEFAULT 0, -- 0 = lifetime
       bound_user_id TEXT,
@@ -101,6 +133,8 @@ export function initDatabase() {
       bound_hwid TEXT,
       activations_count INTEGER DEFAULT 0,
       note TEXT,
+      is_frozen INTEGER DEFAULT 0,
+      frozen_at INTEGER DEFAULT 0,
       expires_at INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (app_id) REFERENCES applications(id) ON DELETE CASCADE
@@ -180,6 +214,9 @@ export function initDatabase() {
       name TEXT NOT NULL,
       url TEXT NOT NULL,
       events TEXT NOT NULL, -- comma separated e.g. 'new_user,login,license_activated'
+      platform TEXT DEFAULT 'discord', -- 'discord' | 'telegram'
+      telegram_chat_id TEXT DEFAULT '',
+      telegram_token TEXT DEFAULT '',
       is_active INTEGER DEFAULT 1,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (app_id) REFERENCES applications(id) ON DELETE CASCADE
@@ -215,6 +252,8 @@ export function initDatabase() {
       title TEXT NOT NULL,
       message TEXT NOT NULL,
       type TEXT DEFAULT 'info', -- 'info' | 'warning' | 'security'
+      link_url TEXT,
+      image_url TEXT,
       is_read INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
@@ -281,6 +320,9 @@ export function initDatabase() {
       admin_notes TEXT DEFAULT '',
       reviewed_at INTEGER DEFAULT 0,
       reviewed_by TEXT DEFAULT '',
+      coupon_code TEXT DEFAULT '',
+      discount_percent INTEGER DEFAULT 0,
+      original_amount REAL DEFAULT 0,
       status TEXT DEFAULT 'pending', -- 'pending' | 'approved' | 'rejected'
       created_at INTEGER NOT NULL,
       FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE

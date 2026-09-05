@@ -19,7 +19,8 @@ export function getAppUsers(req, res) {
   const users = db.prepare(`
     SELECT 
       id, app_id, username, token, license_key, hwid, sid, status, ban_reason,
-      failed_attempts, locked_until, expires_at, last_ip, last_login, created_at
+      failed_attempts, locked_until, expires_at, is_online, last_heartbeat, session_killed, last_hwid_reset,
+      last_ip, last_login, created_at
     FROM application_users
     WHERE app_id = ?
     ORDER BY created_at DESC

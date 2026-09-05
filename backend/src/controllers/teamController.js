@@ -17,6 +17,16 @@ const DEFAULT_PERMISSIONS = {
   api_access: false
 };
 
+function safeParseJSON(val, fallback) {
+  if (!val) return fallback;
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch (e) {
+    return fallback;
+  }
+}
+
 // 1. Create Team (Owner)
 export function createTeam(req, res) {
   const { name } = req.body;
@@ -109,7 +119,7 @@ export function getMyTeam(req, res) {
   // Parse permissions JSON
   const parsedActiveMembers = activeMembers.map(m => ({
     ...m,
-    permissions: typeof m.permissions === 'string' ? JSON.parse(m.permissions || '{}') : (m.permissions || DEFAULT_PERMISSIONS)
+    permissions: safeParseJSON(m.permissions, DEFAULT_PERMISSIONS)
   }));
 
   // Pending join requests
@@ -436,9 +446,7 @@ export function getJoinedTeam(req, res) {
   }
 
   // Parse permissions
-  const permissions = typeof membership.permissions === 'string'
-    ? JSON.parse(membership.permissions || '{}')
-    : (membership.permissions || DEFAULT_PERMISSIONS);
+  const permissions = safeParseJSON(membership.permissions, DEFAULT_PERMISSIONS);
 
   // Fetch Team Owner's Applications
   const ownerApps = db.prepare(`
@@ -524,7 +532,7 @@ export function getTeamAppUsers(req, res) {
   `).get(userId);
 
   if (!membership) return res.status(403).json({ success: false, message: 'You are not an active member of any team.' });
-  const perms = typeof membership.permissions === 'string' ? JSON.parse(membership.permissions) : membership.permissions;
+  const perms = safeParseJSON(membership.permissions, DEFAULT_PERMISSIONS);
   if (!perms.manage_users && membership.role !== 'admin') {
     return res.status(403).json({ success: false, message: 'You do not have permission to manage team users.' });
   }
@@ -556,7 +564,7 @@ export function getTeamAppLicenses(req, res) {
   `).get(userId);
 
   if (!membership) return res.status(403).json({ success: false, message: 'You are not an active member of any team.' });
-  const perms = typeof membership.permissions === 'string' ? JSON.parse(membership.permissions) : membership.permissions;
+  const perms = safeParseJSON(membership.permissions, DEFAULT_PERMISSIONS);
   if (!perms.manage_licenses && membership.role !== 'admin') {
     return res.status(403).json({ success: false, message: 'You do not have permission to view team licenses.' });
   }

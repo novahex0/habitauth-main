@@ -308,7 +308,7 @@ export function exportLicenses(req, res) {
   const txtContent = licenses.map(l => l.license_key).join('\r\n');
   res.setHeader('Content-Type', 'text/plain');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.send(txtContent);
+  return res.send(txtContent);
 }
 
 // 8. Freeze / Pause Subscriptions (Maintenance Mode)

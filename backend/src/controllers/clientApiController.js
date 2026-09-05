@@ -218,7 +218,7 @@ export function clientInit(req, res) {
   const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
   const appVersionClean = appVersionRaw.replace(/^v/i, '');
 
-  if (appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
+  if (app.force_update_enabled && appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
     recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw || 'none'} while app requires v${appVersionRaw}`, extractClientIp(req));
     return sendSignedResponse(res, 426, {
       success: false,
@@ -325,7 +325,7 @@ export async function clientLogin(req, res) {
   const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
   const appVersionClean = appVersionRaw.replace(/^v/i, '');
 
-  if (appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
+  if (app.force_update_enabled && appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
     return sendSignedResponse(res, 426, {
       success: false,
       code: 'UPDATE_REQUIRED',
@@ -736,7 +736,7 @@ export async function clientRegister(req, res) {
   const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
   const appVersionClean = appVersionRaw.replace(/^v/i, '');
 
-  if (appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
+  if (app.force_update_enabled && appVersionClean && (!clientVersionClean || clientVersionClean !== appVersionClean)) {
     recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw || 'none'} while app requires v${appVersionRaw}`, ip);
     return sendSignedResponse(res, 426, {
       success: false,
@@ -796,13 +796,6 @@ export async function clientRegister(req, res) {
     SET status = 'active', bound_user_id = ?, bound_username = ?, bound_hwid = ?, activations_count = activations_count + 1, expires_at = ?
     WHERE id = ?
   `).run(newUserId, username.trim(), cleanHwid, expiresAt, lic.id);
-
-  if (cleanHwid) {
-    db.prepare(`
-      INSERT INTO devices (id, app_id, user_id, hwid, device_name, os, status, first_seen, last_seen)
-      VALUES (?, ?, ?, ?, 'Client Workstation', 'Windows', 'bound', ?, ?)
-    `).run('dev_' + uuidv4().slice(0, 10), app_id, newUserId, cleanHwid, now, now);
-  }
 
   recordAuditLog(app.user_id, app_id, 'CLIENT_USER_REGISTERED', `User '${username}' registered with license key '${lic.license_key}'`, ip);
 
@@ -874,7 +867,7 @@ export async function clientLicenseOnlyLogin(req, res) {
   const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
   const appVersionClean = appVersionRaw.replace(/^v/i, '');
 
-  if (appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
+  if (app.force_update_enabled && appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
     recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw} while app requires v${appVersionRaw}`, ip);
     return sendSignedResponse(res, 426, {
       success: false,

@@ -264,7 +264,9 @@ export default function PaymentPage() {
   // Price calculations
   const isMobile = activeTab === 'mobile_banking';
   const currency = isMobile ? 'BDT' : 'USD';
-  const basePrice = isMobile ? (sessionData?.amount_bdt || 150) : (sessionData?.amount_usd || 1.20);
+  const defaultBdt = sessionData?.plan === 'pro' ? (sessionData?.billing_cycle === 'yearly' ? 4000 : 400) : (sessionData?.billing_cycle === 'yearly' ? 1500 : 150);
+  const defaultUsd = sessionData?.plan === 'pro' ? (sessionData?.billing_cycle === 'yearly' ? 32.00 : 3.20) : (sessionData?.billing_cycle === 'yearly' ? 12.00 : 1.20);
+  const basePrice = isMobile ? (sessionData?.amount_bdt || defaultBdt) : (sessionData?.amount_usd || defaultUsd);
 
   let finalPrice = basePrice;
   if (appliedCoupon && appliedCoupon.discount_percent) {

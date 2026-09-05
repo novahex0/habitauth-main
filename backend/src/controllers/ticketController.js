@@ -167,7 +167,7 @@ export function addTicketMessage(req, res) {
   res.json({
     success: true,
     message: 'Message sent successfully.',
-    newMessage: { id: msgId, ticket_id: ticketId, sender_id: user.id, sender_name: user.username, sender_role: role, message: message.trim(), created_at: now }
+    newMessage: { id: msgId, ticket_id: ticketId, sender_id: senderId, sender_name: name, sender_role: role, message: message.trim(), created_at: now }
   });
 }
 
