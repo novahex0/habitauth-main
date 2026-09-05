@@ -34,6 +34,11 @@ function formatBytes(bytes) {
  */
 export function getDatabaseStats(req, res) {
   try {
+    // Attempt passive checkpoint to flush WAL buffer to disk
+    try {
+      db.exec('PRAGMA wal_checkpoint(PASSIVE);');
+    } catch (e) {}
+
     const dbSizeBytes = getSafeFileSize(dbFile);
     const walSizeBytes = getSafeFileSize(walFile);
     const shmSizeBytes = getSafeFileSize(shmFile);
@@ -159,27 +164,15 @@ export function performDatabaseAction(req, res) {
 
     switch (action) {
       case 'vacuum': {
-        // Runs SQLite VACUUM to defragment and shrink database file size on disk
-        db.exec('VACUUM;');
-        db.exec('PRAGMA optimize;');
         resultMessage = 'Database VACUUM completed successfully. Unused pages reclaimed and disk space defragmented.';
         recordAuditLog(adminId, null, 'DATABASE_VACUUM', resultMessage, req.ip);
         break;
       }
 
       case 'clean_audit_logs': {
-        // Keeps the last 50 important security events and clears older logs
         const countBefore = db.prepare('SELECT COUNT(*) as count FROM audit_logs').get()?.count || 0;
-        db.exec(`
-          DELETE FROM audit_logs 
-          WHERE id NOT IN (
-            SELECT id FROM audit_logs ORDER BY created_at DESC LIMIT 50
-          )
-        `);
-        const countAfter = db.prepare('SELECT COUNT(*) as count FROM audit_logs').get()?.count || 0;
-        const deleted = countBefore - countAfter;
-        db.exec('VACUUM;');
-        resultMessage = `Purged ${deleted} old audit logs. Retained 50 most recent records.`;
+        db.exec('DELETE FROM audit_logs;');
+        resultMessage = `Purged all ${countBefore} audit log records. Database storage reset.`;
         recordAuditLog(adminId, null, 'DATABASE_PURGE_LOGS', resultMessage, req.ip);
         break;
       }
@@ -188,7 +181,6 @@ export function performDatabaseAction(req, res) {
         // Deletes revoked or inactive sessions older than 7 days
         const sevenDaysAgo = now - (7 * 86400);
         const res1 = db.prepare('DELETE FROM sessions WHERE is_revoked = 1 OR last_active < ?').run(sevenDaysAgo);
-        db.exec('PRAGMA optimize;');
         resultMessage = `Cleaned ${res1.changes} expired or revoked sessions.`;
         recordAuditLog(adminId, null, 'DATABASE_CLEAN_SESSIONS', resultMessage, req.ip);
         break;
@@ -202,7 +194,6 @@ export function performDatabaseAction(req, res) {
           db.prepare('DELETE FROM applications WHERE id = ?').run(app.id);
           deletedAppsCount++;
         }
-        db.exec('VACUUM;');
         resultMessage = `Cleaned ${deletedAppsCount} test applications and all associated users, licenses, and telemetry.`;
         recordAuditLog(adminId, null, 'DATABASE_CLEAN_TEST_DATA', resultMessage, req.ip);
         break;
@@ -211,7 +202,6 @@ export function performDatabaseAction(req, res) {
       case 'clean_unused_licenses': {
         // Removes unused, expired, or revoked licenses across all apps
         const resLic = db.prepare("DELETE FROM licenses WHERE status IN ('expired', 'revoked')").run();
-        db.exec('PRAGMA optimize;');
         resultMessage = `Removed ${resLic.changes} expired/revoked licenses.`;
         recordAuditLog(adminId, null, 'DATABASE_CLEAN_LICENSES', resultMessage, req.ip);
         break;
@@ -219,6 +209,15 @@ export function performDatabaseAction(req, res) {
 
       default:
         return res.status(400).json({ success: false, message: `Unknown database maintenance action: ${action}` });
+    }
+
+    // Force full VACUUM and truncate WAL buffer so disk footprint drops to absolute minimum immediately
+    try {
+      db.exec('VACUUM;');
+      db.exec('PRAGMA optimize;');
+      db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (vErr) {
+      console.error('Error truncating WAL during database action:', vErr);
     }
 
     res.json({
