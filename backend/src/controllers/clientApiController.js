@@ -177,6 +177,8 @@ export function clientInit(req, res) {
         message: 'Startup token is bound to a revoked license key.'
       }, app, sessionNonce);
     }
+  }
+
   // Application Version Check & Update Enforcement
   const clientVersionRaw = client_version ? String(client_version).trim() : '';
   const appVersionRaw = (app.latest_version || app.version || '').trim();
