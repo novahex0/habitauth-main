@@ -18,16 +18,18 @@ class HabitAuth:
     """
     HabitAuth Python Enterprise Client SDK
     """
-    def __init__(self, app_name, app_id, app_secret="", public_key="", version="1.0.0", base_url="http://localhost:5000/api/v1"):
-        if not app_id:
-            raise ValueError("[HabitAuth] app_id cannot be empty.")
+    def __init__(self, app_name="HabitApp", app_id=None, app_secret="", public_key="", version="1.0.0", base_url="https://habitauth.onrender.com/api/v1", ownerid=None):
+        effective_id = app_id or ownerid
+        if not effective_id:
+            raise ValueError("[HabitAuth] app_id or ownerid cannot be empty.")
 
         self.app_name = app_name or "HabitApp"
-        self.app_id = app_id
+        self.app_id = effective_id
+        self.ownerid = effective_id
         self.app_secret = app_secret
         self.public_key = public_key
         self.version = version
-        self.base_url = base_url.rstrip('/')
+        self.base_url = (base_url or "https://habitauth.onrender.com/api/v1").rstrip('/')
 
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": f"HabitAuth-Python-SDK/{version}"})
@@ -39,6 +41,10 @@ class HabitAuth:
         self.download_url = ""
         self.session_token = None
         self.session_nonce = None
+
+        # Clock skew compensation for worldwide users
+        self._clock_offset = 0
+        self._clock_offset_synced = False
 
         self.user = None
         self.app = None
@@ -94,6 +100,17 @@ class HabitAuth:
             if not res.get("success"):
                 return False, res.get("message", "Initialization failed.")
 
+            # Automatic Clock Synchronization:
+            # Calibrate the exact time difference between client machine and HabitAuth server.
+            # Ensures 100% reliability for users across all worldwide timezones or with unsynced Windows clocks.
+            server_time = res.get("server_time") or res.get("timestamp")
+            if server_time is not None and not self._clock_offset_synced:
+                try:
+                    self._clock_offset = int(server_time) - int(time.time())
+                    self._clock_offset_synced = True
+                except Exception:
+                    pass
+
             if res.get("public_key") and not self.public_key:
                 self.public_key = res.get("public_key")
 
@@ -139,6 +156,7 @@ class HabitAuth:
             "password": password,
             "license_key": license_key.strip() if license_key else "",
             "hwid": self.get_hwid(),
+            "client_version": self.version,
             "nonce": self._generate_nonce()
         }
 
@@ -153,6 +171,7 @@ class HabitAuth:
             "app_id": self.app_id,
             "license_key": license_key.strip() if license_key else "",
             "hwid": self.get_hwid(),
+            "client_version": self.version,
             "nonce": self._generate_nonce()
         }
 
@@ -294,8 +313,9 @@ class HabitAuth:
             try:
                 server_ts = int(ts_str)
                 current_ts = int(time.time())
-                if abs(current_ts - server_ts) > 30:
-                    raise PermissionError("[HabitAuth] Replay attack detected: Expired server timestamp.")
+                synced_ts = current_ts + self._clock_offset
+                if abs(synced_ts - server_ts) > 120:
+                    raise PermissionError("[HabitAuth] Anti-replay check failed: Server timestamp skew detected. Please verify your system clock.")
             except ValueError:
                 pass
 
@@ -328,3 +348,14 @@ class HabitAuth:
     def _check_init(self):
         if not self.is_initialized:
             raise RuntimeError("[HabitAuth] You must call auth.init() before invoking authentication methods.")
+
+
+class api(HabitAuth):
+    """
+    KeyAuth-compatible drop-in alias class for Python.
+    Usage:
+        habit_app = api(name="My Application", ownerid="APP-XXXX", secret="SECRET", version="1.0.0")
+    """
+    def __init__(self, name, ownerid, secret="", version="1.0.0", url="https://habitauth.onrender.com/api/v1"):
+        super().__init__(app_name=name, app_id=ownerid, app_secret=secret, version=version, base_url=url, ownerid=ownerid)
+

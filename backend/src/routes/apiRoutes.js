@@ -160,9 +160,13 @@ router.post('/auth/client-register', clientRegister); // Register user with lice
 router.post('/client/register', clientRegister);
 router.post('/auth/client-license', clientLicenseOnlyLogin); // Instant license-only authentication
 router.post('/client/license', clientLicenseOnlyLogin);
+router.post('/client/license-login', clientLicenseOnlyLogin);
 router.post('/client/heartbeat', clientHeartbeat); // Active user heartbeat (remote killswitch trigger)
+router.post('/auth/client-heartbeat', clientHeartbeat);
 router.post('/client/reset-hwid', clientResetHwid); // Self-service HWID reset endpoint
+router.post('/auth/client-reset-hwid', clientResetHwid);
 router.post('/license/validate', validateLicense);
+router.post('/client/license/validate', validateLicense);
 router.post('/license/activate', activateLicense);
 router.post('/license/deactivate', deactivateLicense);
 router.get('/app/info/:appId', getPublicAppInfo);

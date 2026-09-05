@@ -19,6 +19,7 @@ export function sendSignedResponse(res, status, payload, appOrSecret = null, non
   const responseData = {
     ...payload,
     timestamp,
+    server_time: timestamp,
     ...(nonce ? { nonce } : {})
   };
 
@@ -673,6 +674,23 @@ export async function clientRegister(req, res) {
     }, app, nonce);
   }
 
+  // Application Version Check & Update Enforcement
+  const clientVersionRaw = (req.body.client_version || req.body.clientVersion || req.body.version || '').trim();
+  const appVersionRaw = (app.latest_version || app.version || '').trim();
+  const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
+  const appVersionClean = appVersionRaw.replace(/^v/i, '');
+
+  if (appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
+    recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw} while app requires v${appVersionRaw}`, ip);
+    return sendSignedResponse(res, 426, {
+      success: false,
+      code: 'UPDATE_REQUIRED',
+      message: `A mandatory update (v${appVersionRaw}) is required to continue. You are currently running v${clientVersionRaw || '1.0.0'}. Please update your client.`,
+      latest_version: appVersionRaw,
+      download_url: app.update_download_url || ''
+    }, app, nonce);
+  }
+
   const existingUser = db.prepare('SELECT id FROM application_users WHERE app_id = ? AND username = ?').get(app_id, username.trim());
   if (existingUser) {
     return sendSignedResponse(res, 409, { success: false, message: 'Username already registered.' }, app, nonce);
@@ -779,6 +797,23 @@ export async function clientLicenseOnlyLogin(req, res) {
       success: false,
       code: subCheck.code,
       message: subCheck.message
+    }, app, nonce);
+  }
+
+  // Application Version Check & Update Enforcement
+  const clientVersionRaw = (req.body.client_version || req.body.clientVersion || req.body.version || '').trim();
+  const appVersionRaw = (app.latest_version || app.version || '').trim();
+  const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
+  const appVersionClean = appVersionRaw.replace(/^v/i, '');
+
+  if (appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
+    recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw} while app requires v${appVersionRaw}`, ip);
+    return sendSignedResponse(res, 426, {
+      success: false,
+      code: 'UPDATE_REQUIRED',
+      message: `A mandatory update (v${appVersionRaw}) is required to continue. You are currently running v${clientVersionRaw || '1.0.0'}. Please update your client.`,
+      latest_version: appVersionRaw,
+      download_url: app.update_download_url || ''
     }, app, nonce);
   }
 

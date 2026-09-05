@@ -17,7 +17,7 @@ export default function SdkCodeViewer({ sdk, activeApp, onCopy, copiedKey }) {
         .replace(/TARGET_APP_NAME/g, activeApp.app_name)
         .replace(/TARGET_APP_SECRET/g, activeApp.app_secret || '')
         .replace(/TARGET_PUBLIC_KEY/g, activeApp.public_key || '')
-    : rawCode).replace(/TARGET_API_URL/g, apiBase);
+    : rawCode).replace(/http:\/\/localhost:5000\/api\/v1/g, apiBase);
 
   const personalizedExample = (activeApp
     ? sdk.usageExample
@@ -25,7 +25,7 @@ export default function SdkCodeViewer({ sdk, activeApp, onCopy, copiedKey }) {
         .replace(/TARGET_APP_NAME/g, activeApp.app_name)
         .replace(/TARGET_APP_SECRET/g, activeApp.app_secret || '')
         .replace(/TARGET_PUBLIC_KEY/g, activeApp.public_key || '')
-    : sdk.usageExample).replace(/TARGET_API_URL/g, apiBase);
+    : sdk.usageExample).replace(/http:\/\/localhost:5000\/api\/v1/g, apiBase);
 
   const codeToDisplay = activeTab === 'example' ? personalizedExample : personalizedCode;
   const lines = codeToDisplay.split('\n');

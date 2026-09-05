@@ -4038,10 +4038,11 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   <span className="badge badge-active">{currentAppDetails.status}</span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
+                {/* Top Row: App Identifiers (App Name, App ID / Owner ID, Client Version) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px', marginBottom: '20px' }}>
                   {/* 1. App Name */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">App Name</label>
+                    <label className="form-label" style={{ fontWeight: 600 }}>App Name</label>
                     <div className="flex-align" style={{ gap: '8px' }}>
                       <input type="text" readOnly value={currentAppDetails.app_name} className="form-input" style={{ fontWeight: 700 }} />
                       <button onClick={() => copyToClipboard(currentAppDetails.app_name, 'app_name')} className="btn btn-secondary" style={{ padding: '10px' }} title="Copy App Name">
@@ -4050,58 +4051,27 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                     </div>
                   </div>
 
-                  {/* 2. App ID */}
+                  {/* 2. App ID / Owner ID */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">App ID</label>
+                    <div className="flex-between" style={{ marginBottom: '6px' }}>
+                      <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
+                        App ID <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 400 }}>(Owner ID in SDK)</span>
+                      </label>
+                      <span className="badge" style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                        KeyAuth & HabitAuth
+                      </span>
+                    </div>
                     <div className="flex-align" style={{ gap: '8px' }}>
                       <input type="text" readOnly value={currentAppDetails.id} className="form-input mono-text" style={{ color: 'var(--primary-light)', fontWeight: 700 }} />
-                      <button onClick={() => copyToClipboard(currentAppDetails.id, 'app_id')} className="btn btn-secondary" style={{ padding: '10px' }} title="Copy App ID">
+                      <button onClick={() => copyToClipboard(currentAppDetails.id, 'app_id')} className="btn btn-secondary" style={{ padding: '10px' }} title="Copy App ID / Owner ID">
                         {copiedKey === 'app_id' ? <Check size={16} color="var(--success)" /> : <Copy size={16} />}
                       </button>
                     </div>
                   </div>
 
-                  {/* 3. App Secret */}
+                  {/* 3. Current Application Version */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">App Secret</label>
-                    <div className="flex-align" style={{ gap: '8px' }}>
-                      <input 
-                        type={showSecret ? "text" : "password"} 
-                        readOnly 
-                        value={currentAppDetails.app_secret} 
-                        className="form-input mono-text" 
-                      />
-                      <button onClick={() => setShowSecret(!showSecret)} className="btn btn-secondary" style={{ padding: '10px' }} title={showSecret ? "Hide Secret" : "Reveal Secret"}>
-                        {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                      <button onClick={() => copyToClipboard(currentAppDetails.app_secret, 'app_secret')} className="btn btn-secondary" style={{ padding: '10px' }} title="Copy Secret">
-                        {copiedKey === 'app_secret' ? <Check size={16} color="var(--success)" /> : <Copy size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 3.1 Ed25519 Asymmetric Public Key */}
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Shield size={13} color="var(--primary)" /> Ed25519 Public Key
-                    </label>
-                    <div className="flex-align" style={{ gap: '8px' }}>
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={currentAppDetails.public_key || 'No Public Key Generated'} 
-                        className="form-input mono-text" 
-                        style={{ fontSize: '11.5px', color: '#38bdf8' }}
-                      />
-                      <button onClick={() => copyToClipboard(currentAppDetails.public_key, 'public_key')} className="btn btn-secondary" style={{ padding: '10px' }} title="Copy Public Key">
-                        {copiedKey === 'public_key' ? <Check size={16} color="var(--success)" /> : <Copy size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 4. Current Application Version */}
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Client Version</label>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Client Release Version</label>
                     <div className="flex-align" style={{ gap: '8px' }}>
                       <input 
                         type="text" 
@@ -4120,6 +4090,59 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                         title="Change software release version"
                       >
                         <Edit2 size={13} style={{ marginRight: '5px' }} /> Edit Version
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row: Cryptographic Security Keys (App Secret & Zero-Trust Ed25519 Public Key) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
+                  {/* 4. App Secret */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <div className="flex-between" style={{ marginBottom: '6px' }}>
+                      <label className="form-label" style={{ fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Lock size={13} color="var(--warning)" /> App Secret
+                      </label>
+                      <span className="badge" style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                        HMAC-SHA256
+                      </span>
+                    </div>
+                    <div className="flex-align" style={{ gap: '8px' }}>
+                      <input 
+                        type={showSecret ? "text" : "password"} 
+                        readOnly 
+                        value={currentAppDetails.app_secret} 
+                        className="form-input mono-text" 
+                      />
+                      <button onClick={() => setShowSecret(!showSecret)} className="btn btn-secondary" style={{ padding: '10px' }} title={showSecret ? "Hide Secret" : "Reveal Secret"}>
+                        {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                      <button onClick={() => copyToClipboard(currentAppDetails.app_secret, 'app_secret')} className="btn btn-secondary" style={{ padding: '10px' }} title="Copy Secret">
+                        {copiedKey === 'app_secret' ? <Check size={16} color="var(--success)" /> : <Copy size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 5. Ed25519 Asymmetric Public Key (Zero-Trust) */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <div className="flex-between" style={{ marginBottom: '6px' }}>
+                      <label className="form-label" style={{ fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Shield size={13} color="#38bdf8" /> Ed25519 Public Key
+                      </label>
+                      <span className="badge" style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                        Zero-Trust Client Key
+                      </span>
+                    </div>
+                    <div className="flex-align" style={{ gap: '8px' }}>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={currentAppDetails.public_key || 'No Public Key Generated'} 
+                        className="form-input mono-text" 
+                        style={{ fontSize: '11.5px', color: '#38bdf8' }}
+                      />
+                      <button onClick={() => copyToClipboard(currentAppDetails.public_key, 'public_key')} className="btn btn-secondary" style={{ padding: '10px' }} title="Copy Public Key">
+                        {copiedKey === 'public_key' ? <Check size={16} color="var(--success)" /> : <Copy size={16} />}
                       </button>
                     </div>
                   </div>

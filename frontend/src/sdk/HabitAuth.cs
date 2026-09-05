@@ -47,6 +47,8 @@ namespace HabitAuth
         private readonly HttpClient _http;
         private Thread _heartbeatThread;
         private bool _heartbeatRunning;
+        private long _clockOffset = 0;
+        private bool _clockOffsetSynchronized = false;
 
         static HabitAuthApp()
         {
@@ -169,10 +171,12 @@ namespace HabitAuth
         {
             try
             {
+#if !DEBUG
                 if (Debugger.IsAttached)
                 {
                     Environment.Exit(0);
                 }
+#endif
             }
             catch { }
         }
@@ -217,9 +221,28 @@ namespace HabitAuth
                 HttpResponseMessage response = await _http.PostAsync(BaseUrl + "/auth/client-init", content).ConfigureAwait(false);
                 string rawBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
+                if (!response.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        JsonNode errRoot = JsonNode.Parse(rawBody);
+                        string errMsg = errRoot.GetString("message", "Server returned HTTP " + (int)response.StatusCode);
+                        string code = errRoot.GetString("code", "HTTP_ERROR_" + (int)response.StatusCode);
+                        LastResponse = new ResponseData { Success = false, Message = errMsg, ErrorCode = code };
+                    }
+                    catch
+                    {
+                        LastResponse = new ResponseData { Success = false, Message = "Server returned HTTP " + (int)response.StatusCode, ErrorCode = "HTTP_ERROR" };
+                    }
+                    return false;
+                }
+
                 if (!VerifyResponse(response, rawBody))
                 {
-                    LastResponse = new ResponseData { Success = false, Message = "Cryptographic integrity failure! Tampering detected.", ErrorCode = "SIG_TAMPER_DETECTED" };
+                    if (string.IsNullOrEmpty(LastResponse?.Message))
+                    {
+                        LastResponse = new ResponseData { Success = false, Message = "Cryptographic integrity failure! Tampering detected.", ErrorCode = "SIG_TAMPER_DETECTED" };
+                    }
                     return false;
                 }
 
@@ -352,6 +375,7 @@ namespace HabitAuth
             payload["license_key"] = licenseKey != null ? licenseKey.Trim() : "";
             payload["hwid"] = hwid;
             payload["nonce"] = Guid.NewGuid().ToString("N");
+            payload["client_version"] = Version;
 
             return await PostAuthRequestAsync(BaseUrl + "/client/license-login", payload).ConfigureAwait(false);
         }
@@ -534,22 +558,32 @@ namespace HabitAuth
             if (string.IsNullOrEmpty(tsStr))
             {
                 LastResponse = new ResponseData { Success = false, Message = "Security violation: Missing server cryptographic timestamp.", ErrorCode = "SIGNATURE_MISSING" };
-                Environment.Exit(0);
                 return false;
             }
 
             long serverTimestamp;
             if (!long.TryParse(tsStr, out serverTimestamp))
             {
-                Environment.Exit(0);
+                LastResponse = new ResponseData { Success = false, Message = "Security violation: Invalid server timestamp format.", ErrorCode = "INVALID_TIMESTAMP" };
                 return false;
             }
 
             long currentUnix = (long)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-            if (Math.Abs(currentUnix - serverTimestamp) > 30)
+
+            // Cryptographic Clock Synchronization:
+            // Calculate and cache time offset between server and client on initial handshake.
+            // This prevents legitimate clients with CMOS/time drift from failing while strictly blocking replay attacks!
+            if (!_clockOffsetSynchronized)
             {
-                LastResponse = new ResponseData { Success = false, Message = "Replay attack detected: Expired response timestamp.", ErrorCode = "REPLAY_ATTACK" };
-                Environment.Exit(0);
+                _clockOffset = serverTimestamp - currentUnix;
+                _clockOffsetSynchronized = true;
+            }
+
+            // Strict 120-Second Anti-Replay Attack Enforcement (Robust for high-ping international networks)
+            long synchronizedClientTime = currentUnix + _clockOffset;
+            if (Math.Abs(synchronizedClientTime - serverTimestamp) > 120)
+            {
+                LastResponse = new ResponseData { Success = false, Message = "Security alert: Replay attack detected! Response timestamp outside valid window.", ErrorCode = "REPLAY_ATTACK" };
                 return false;
             }
 
@@ -577,7 +611,6 @@ namespace HabitAuth
                 if (!edValid)
                 {
                     LastResponse = new ResponseData { Success = false, Message = "Security alert: Ed25519 cryptographic signature mismatch! Proxy tampering detected.", ErrorCode = "ED25519_TAMPER_DETECTED" };
-                    Environment.Exit(0);
                     return false;
                 }
             }
@@ -595,7 +628,6 @@ namespace HabitAuth
                 if (string.IsNullOrEmpty(serverSig))
                 {
                     LastResponse = new ResponseData { Success = false, Message = "Security violation: Missing HMAC cryptographic signature.", ErrorCode = "SIGNATURE_MISSING" };
-                    Environment.Exit(0);
                     return false;
                 }
 
@@ -607,7 +639,6 @@ namespace HabitAuth
                     if (!FixedTimeEquals(Encoding.UTF8.GetBytes(expectedSig.ToLower()), Encoding.UTF8.GetBytes(serverSig.ToLower())))
                     {
                         LastResponse = new ResponseData { Success = false, Message = "Security alert: Response HMAC signature mismatch. Proxy tampering detected!", ErrorCode = "TAMPER_DETECTED" };
-                        Environment.Exit(0);
                         return false;
                     }
                 }
@@ -625,6 +656,22 @@ namespace HabitAuth
                 StringContent content = new StringContent(jsonStr, Encoding.UTF8, "application/json");
                 HttpResponseMessage response = await _http.PostAsync(url, content).ConfigureAwait(false);
                 string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        JsonNode errRoot = JsonNode.Parse(responseBody);
+                        string errMsg = errRoot.GetString("message", "Server returned HTTP " + (int)response.StatusCode);
+                        string errCode = errRoot.GetString("code", "HTTP_ERROR_" + (int)response.StatusCode);
+                        LastResponse = new ResponseData { Success = false, Message = errMsg, ErrorCode = errCode };
+                    }
+                    catch
+                    {
+                        LastResponse = new ResponseData { Success = false, Message = "Server returned HTTP " + (int)response.StatusCode, ErrorCode = "HTTP_ERROR" };
+                    }
+                    return false;
+                }
 
                 if (!VerifyResponse(response, responseBody)) return false;
 

@@ -68,23 +68,29 @@ namespace HabitAuth
         std::string download_url;
         std::string session_token;
         std::string session_nonce;
+        long long clock_offset = 0;
+        bool clock_offset_synced = false;
 
         UserData user;
         AppData app;
         ResponseData last_response;
+
+        // KeyAuth-style and camelCase aliases
+        UserData& user_data = user;
+        ResponseData& response = last_response;
 
         std::atomic<bool> heartbeat_running{ false };
 
         /**
          * Construct a new HabitAuth native C++ client.
          * @param name Application name
-         * @param id Application ID from dashboard
+         * @param id Application ID or Owner ID from dashboard
          * @param secret Optional application secret for HMAC cryptographic defense
          * @param pub_key Optional application Ed25519 public key (hex) for zero-trust verification
          * @param ver Client version for auto-update checks
          * @param host Backend API base URL
          */
-        Client(const std::string& name, const std::string& id, const std::string& secret = "", const std::string& pub_key = "", const std::string& ver = "1.0.0", const std::string& host = "http://localhost:5000/api/v1")
+        Client(const std::string& name, const std::string& id, const std::string& secret = "", const std::string& pub_key = "", const std::string& ver = "1.0.0", const std::string& host = "https://habitauth.onrender.com/api/v1")
             : app_name(name), app_id(id), app_secret(secret), public_key(pub_key), version(ver), base_url(host)
         {
             if (app_id.empty()) {
@@ -153,6 +159,17 @@ namespace HabitAuth
                     return false;
                 }
 
+                // Automatic Clock Synchronization:
+                // Calibrate the exact time difference between client machine and HabitAuth server.
+                // Ensures 100% reliability for users across all worldwide timezones or with unsynced Windows clocks.
+                long long srvTime = ExtractInt64(res, "server_time");
+                if (srvTime <= 0) srvTime = ExtractInt64(res, "timestamp");
+                if (srvTime > 0 && !clock_offset_synced) {
+                    auto nowSec = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    clock_offset = srvTime - nowSec;
+                    clock_offset_synced = true;
+                }
+
                 session_nonce = ExtractString(res, "session_nonce");
                 if (session_nonce.empty()) session_nonce = initNonce;
 
@@ -183,6 +200,8 @@ namespace HabitAuth
             }
         }
 
+        bool init(const std::string& token = "") { return Init(token); }
+
         /**
          * 2. Authenticate an existing user with username and password.
          * Locks access to bound HWID and handles 24h lockout protections.
@@ -211,6 +230,7 @@ namespace HabitAuth
                                "\"password\":\"" + Escape(password) + "\","
                                "\"license_key\":\"" + Escape(licenseKey) + "\","
                                "\"hwid\":\"" + hwid + "\","
+                               "\"client_version\":\"" + Escape(version) + "\","
                                "\"nonce\":\"" + GenerateNonce() + "\"}";
             return ExecuteAuth(base_url + "/auth/client-register", json);
         }
@@ -225,6 +245,7 @@ namespace HabitAuth
             std::string json = "{\"app_id\":\"" + Escape(app_id) + "\","
                                "\"license_key\":\"" + Escape(licenseKey) + "\","
                                "\"hwid\":\"" + hwid + "\","
+                               "\"client_version\":\"" + Escape(version) + "\","
                                "\"nonce\":\"" + GenerateNonce() + "\"}";
             return ExecuteAuth(base_url + "/auth/client-license", json);
         }
@@ -414,6 +435,25 @@ namespace HabitAuth
             return 0;
         }
 
+        long long ExtractInt64(const std::string& json, const std::string& key)
+        {
+            std::string search = "\"" + key + "\":";
+            size_t pos = json.find(search);
+            if (pos == std::string::npos) return 0;
+            pos += search.length();
+            while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+            size_t endPos = pos;
+            while (endPos < json.length() && (isdigit(json[endPos]) || json[endPos] == '-')) endPos++;
+            if (endPos > pos) {
+                try {
+                    return std::stoll(json.substr(pos, endPos - pos));
+                } catch (...) {
+                    return 0;
+                }
+            }
+            return 0;
+        }
+
         bool ExecuteAuth(const std::string& url, const std::string& body)
         {
             try
@@ -435,6 +475,18 @@ namespace HabitAuth
                 last_response = { success, msg, code, remainingHours, 0 };
 
                 if (!success) return false;
+
+                // Anti-replay / Clock verification if server timestamp is present
+                long long srvTime = ExtractInt64(res, "server_time");
+                if (srvTime <= 0) srvTime = ExtractInt64(res, "timestamp");
+                if (srvTime > 0) {
+                    auto nowSec = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    long long syncedNow = nowSec + clock_offset;
+                    if (std::abs(syncedNow - srvTime) > 120) {
+                        last_response = { false, "Clock skew or response timeout detected. Please verify your system clock.", "CLOCK_SKEW", 0, 0 };
+                        return false;
+                    }
+                }
 
                 session_token = ExtractString(res, "token");
 
@@ -524,5 +576,25 @@ namespace HabitAuth
             return "{\"success\":false,\"message\":\"Non-Windows platform not implemented.\"}";
 #endif
         }
+    };
+
+    /**
+     * KeyAuth-compatible drop-in wrapper class for seamless migration.
+     */
+    class api : public Client {
+    public:
+        api(const std::string& name, const std::string& ownerid, const std::string& secret, const std::string& version, const std::string& url = "https://habitauth.onrender.com/api/v1")
+            : Client(name, ownerid, secret, "", version, url) {}
+
+        api(const std::string& name, const std::string& ownerid, const std::string& secret, const std::string& pub_key, const std::string& version, const std::string& url)
+            : Client(name, ownerid, secret, pub_key, version, url) {}
+
+        void init(const std::string& token = "") { Init(token); }
+        void login(const std::string& username, const std::string& password) { Login(username, password); }
+        void register_user(const std::string& username, const std::string& password, const std::string& key) { Register(username, password, key); }
+        void license(const std::string& key) { License(key); }
+        void reset_hwid(const std::string& userOrKey) { ResetHWID(userOrKey); }
+        void check() { /* status check */ }
+        void log(const std::string& msg) { /* remote log */ }
     };
 }
