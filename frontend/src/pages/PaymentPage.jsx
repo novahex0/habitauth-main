@@ -1,33 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Home, X, Headphones, Info, AlignLeft, Copy, Check, ShieldCheck, 
-  Tag, AlertCircle, CheckCircle2, Clock, Zap, ArrowRight, ExternalLink, RefreshCw
+  ArrowLeft, X, Headphones, Info, AlignLeft, Copy, Check, ShieldCheck, 
+  Tag, AlertCircle, CheckCircle2, Clock, Zap, ExternalLink, RefreshCw, QrCode, Phone, Mail, MessageCircle
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function PaymentPage() {
   const { language } = useLanguage();
+  
+  // Extract sessionId from path e.g. /payment/:sessionId
   const [sessionId, setSessionId] = useState(() => {
     const parts = window.location.pathname.split('/');
     const idx = parts.indexOf('payment');
     return idx !== -1 && parts[idx + 1] ? parts[idx + 1] : '';
   });
 
-  const [searchMethod, setSearchMethod] = useState(() => {
-    const p = new URLSearchParams(window.location.search);
-    return p.get('method') === 'international' ? 'international' : 'mobile_banking';
-  });
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialMethod = urlParams.get('method') === 'international' ? 'international' : 'mobile_banking';
+  const initialGateway = urlParams.get('gateway') || '';
+
+  // Step 1: 'select_gateway' | Step 2: 'enter_transaction'
+  const [currentStep, setCurrentStep] = useState(initialGateway ? 'enter_transaction' : 'select_gateway');
+  const [activeTab, setActiveTab] = useState(initialMethod);
+  const [selectedGatewayId, setSelectedGatewayId] = useState(initialGateway || 'bkash');
 
   const [sessionData, setSessionData] = useState(null);
   const [gateways, setGateways] = useState({});
   const [loadingSession, setLoadingSession] = useState(true);
   const [sessionError, setSessionError] = useState('');
 
-  // Selected payment method & gateway
-  const [activeTab, setActiveTab] = useState(searchMethod); // 'mobile_banking' | 'international'
-  const [selectedGatewayId, setSelectedGatewayId] = useState('bkash');
-
-  // Input states
+  // Form inputs
   const [senderNumber, setSenderNumber] = useState('');
   const [trxId, setTrxId] = useState('');
   const [couponCode, setCouponCode] = useState('');
@@ -35,14 +37,16 @@ export default function PaymentPage() {
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [couponError, setCouponError] = useState('');
 
-  // Submission states
+  // Submission
   const [submitting, setSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
   const [submitError, setSubmitError] = useState('');
 
-  // UI helpers
+  // Modals
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelCountdown, setCancelCountdown] = useState(3);
+  const [activeInfoModal, setActiveInfoModal] = useState(null); // null | 'support' | 'info' | 'details' | 'qr'
   const [copiedKey, setCopiedKey] = useState(null);
-  const [activeInfoModal, setActiveInfoModal] = useState(null); // null | 'support' | 'info' | 'details'
 
   const copyToClipboard = (text, key) => {
     if (!text) return;
@@ -51,16 +55,62 @@ export default function PaymentPage() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  // Sync tab change to URL search params without reload
-  const handleTabChange = (newTab) => {
-    setActiveTab(newTab);
-    const newGateway = newTab === 'mobile_banking' ? 'bkash' : 'binance_pay';
-    setSelectedGatewayId(newGateway);
-
+  // Sync URL query params with current state
+  const updateUrl = (method, gateway) => {
     const url = new URL(window.location);
-    url.searchParams.set('method', newTab);
+    url.searchParams.set('method', method);
+    if (gateway) {
+      url.searchParams.set('gateway', gateway);
+      url.searchParams.set('accountType', 'personal');
+    } else {
+      url.searchParams.delete('gateway');
+      url.searchParams.delete('accountType');
+    }
     window.history.pushState({}, '', url);
   };
+
+  // Tab change
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    const defGateway = newTab === 'mobile_banking' ? 'bkash' : 'binance_pay';
+    setSelectedGatewayId(defGateway);
+    updateUrl(newTab, currentStep === 'enter_transaction' ? defGateway : null);
+  };
+
+  // Select gateway and advance to Step 2
+  const handleSelectGatewayAndProceed = (gwId) => {
+    setSelectedGatewayId(gwId);
+    setCurrentStep('enter_transaction');
+    updateUrl(activeTab, gwId);
+  };
+
+  // Back button to Step 1
+  const handleBackToSelection = () => {
+    setCurrentStep('select_gateway');
+    updateUrl(activeTab, null);
+  };
+
+  // Cancel modal handler
+  const handleTriggerCancel = () => {
+    setShowCancelModal(true);
+    setCancelCountdown(3);
+  };
+
+  useEffect(() => {
+    let timer;
+    if (showCancelModal) {
+      if (cancelCountdown > 0) {
+        timer = setTimeout(() => setCancelCountdown(prev => prev - 1), 1000);
+      } else {
+        if (window.opener) {
+          window.close();
+        } else {
+          window.location.href = '/overview';
+        }
+      }
+    }
+    return () => clearTimeout(timer);
+  }, [showCancelModal, cancelCountdown]);
 
   // Load session from backend
   useEffect(() => {
@@ -68,7 +118,7 @@ export default function PaymentPage() {
 
     async function loadData() {
       if (!sessionId) {
-        setSessionError('Invalid payment link. No session ID specified.');
+        setSessionError('Invalid payment link. No session ID provided.');
         setLoadingSession(false);
         return;
       }
@@ -82,14 +132,8 @@ export default function PaymentPage() {
         if (data.success && data.session) {
           setSessionData(data.session);
           setGateways(data.gateways || {});
-
-          if (searchMethod === 'international') {
-            setSelectedGatewayId('binance_pay');
-          } else {
-            setSelectedGatewayId('bkash');
-          }
         } else {
-          // Fallback: check localStorage for offline-saved session
+          // Fallback from localStorage
           try {
             const fallback = localStorage.getItem('habit_payment_session_' + sessionId);
             if (fallback) {
@@ -108,7 +152,7 @@ export default function PaymentPage() {
           setSessionError(data.message || 'Payment session has expired or is invalid.');
         }
       } catch (err) {
-        if (isMounted) setSessionError('Failed to connect to Habit Auth payment gateway.');
+        if (isMounted) setSessionError('Failed to connect to Habit Auth gateway.');
       } finally {
         if (isMounted) setLoadingSession(false);
       }
@@ -116,9 +160,9 @@ export default function PaymentPage() {
 
     loadData();
     return () => { isMounted = false; };
-  }, [sessionId, searchMethod]);
+  }, [sessionId]);
 
-  // Handle coupon validation
+  // Coupon validation
   const handleApplyCoupon = async (e) => {
     if (e) e.preventDefault();
     if (!couponCode.trim()) return;
@@ -158,28 +202,28 @@ export default function PaymentPage() {
     setCouponError('');
   };
 
-  // Submit payment claim
+  // Submit payment order
   const handleSubmitPayment = async (e) => {
     if (e) e.preventDefault();
     setSubmitError('');
 
     const token = localStorage.getItem('habit_token');
     if (!token) {
-      setSubmitError('Authentication required. Please sign in to complete payment.');
+      setSubmitError('Authentication required. Please sign in to verify transaction.');
       return;
     }
 
     if (!senderNumber.trim()) {
       setSubmitError(
         activeTab === 'mobile_banking'
-          ? 'Please enter your sender mobile number (bKash/Nagad/Rocket).'
+          ? 'Please enter your sender mobile number.'
           : 'Please enter your Binance Pay ID or Sender Wallet Address.'
       );
       return;
     }
 
     if (!trxId.trim()) {
-      setSubmitError('Please enter the Transaction ID (TrxID / TxID) from your receipt.');
+      setSubmitError('Please enter the Transaction ID (TrxID) from your SMS receipt.');
       return;
     }
 
@@ -206,16 +250,16 @@ export default function PaymentPage() {
       if (data.success) {
         setOrderSuccess(data.order);
       } else {
-        setSubmitError(data.message || 'Payment submission failed. Please check your TrxID.');
+        setSubmitError(data.message || 'Verification failed. Please check your TrxID.');
       }
     } catch (err) {
-      setSubmitError('Network error while submitting order. Please try again.');
+      setSubmitError('Network error while verifying transaction.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Calculate current amount
+  // Price calculations
   const isMobile = activeTab === 'mobile_banking';
   const currency = isMobile ? 'BDT' : 'USD';
   const basePrice = isMobile ? (sessionData?.amount_bdt || 150) : (sessionData?.amount_usd || 1.20);
@@ -233,6 +277,15 @@ export default function PaymentPage() {
     instructions: 'Send money and paste the transaction TrxID below.'
   };
 
+  // Color theme per gateway
+  const gatewayTheme = {
+    bkash: { primary: '#e2136e', bgTint: 'rgba(226, 19, 110, 0.06)', name: 'BKASH', code: '*247#' },
+    nagad: { primary: '#f7941d', bgTint: 'rgba(247, 148, 29, 0.06)', name: 'NAGAD', code: '*167#' },
+    rocket: { primary: '#8c3494', bgTint: 'rgba(140, 52, 148, 0.06)', name: 'ROCKET', code: '*322#' },
+    binance_pay: { primary: '#d97706', bgTint: 'rgba(217, 119, 6, 0.06)', name: 'BINANCE PAY', code: 'Binance App' },
+    trc20: { primary: '#0891b2', bgTint: 'rgba(8, 145, 178, 0.06)', name: 'TRON TRC20', code: 'TronLink / Trust' }
+  }[selectedGatewayId] || { primary: '#004ecc', bgTint: 'rgba(0, 78, 204, 0.06)', name: 'PAYMENT', code: '' };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -246,49 +299,94 @@ export default function PaymentPage() {
       fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
       color: '#0f172a'
     }}>
-      
-      {/* Central Modal Card matching user screenshot */}
+
+      {/* ── CANCEL MODAL (MATCHING SCREENSHOT 4/5) ── */}
+      {showCancelModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px', zIndex: 9999
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: '20px', padding: '36px 32px', textAlign: 'center',
+            maxWidth: '400px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            {/* Red Circle with X */}
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%', background: '#fee2e2',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'
+            }}>
+              <X size={32} color="#ef4444" strokeWidth={3} />
+            </div>
+
+            <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', marginBottom: '8px' }}>
+              Invoice Canceled
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.5, marginBottom: '24px' }}>
+              Your request to cancel the invoice has been processed successfully.
+            </p>
+
+            {/* Progress Bar */}
+            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
+              Redirecting in {cancelCountdown} seconds...
+            </div>
+            <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${((3 - cancelCountdown) / 3) * 100}%`,
+                background: '#ef4444',
+                transition: 'width 1s linear'
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MAIN CARD CONTAINER ── */}
       <div style={{
         background: '#ffffff',
         borderRadius: '24px',
-        boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.9)',
+        boxShadow: '0 20px 45px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(226, 232, 240, 0.9)',
         width: '100%',
         maxWidth: '520px',
         padding: '28px 24px',
         position: 'relative'
       }}>
 
-        {/* Top Control Bar: Home & Close */}
+        {/* Top Control Bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <button
-            type="button"
-            onClick={() => window.location.href = '/'}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer', color: '#64748b',
-              padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center'
-            }}
-            title="Go to Home"
-          >
-            <Home size={20} />
-          </button>
+          {currentStep === 'enter_transaction' ? (
+            <button
+              type="button"
+              onClick={handleBackToSelection}
+              style={{
+                background: '#f1f5f9', border: '1px solid #e2e8f0', cursor: 'pointer', color: '#334155',
+                padding: '7px 12px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                fontSize: '12px', fontWeight: 700
+              }}
+              title="Change Payment Method"
+            >
+              <ArrowLeft size={14} />
+              <span>Back</span>
+            </button>
+          ) : (
+            <div />
+          )}
 
           <button
             type="button"
-            onClick={() => {
-              if (window.opener) window.close();
-              else window.location.href = '/overview';
-            }}
+            onClick={handleTriggerCancel}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8',
-              padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center'
+              background: '#f1f5f9', border: '1px solid #e2e8f0', cursor: 'pointer', color: '#94a3b8',
+              padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
-            title="Close"
+            title="Cancel Invoice"
           >
-            <X size={20} />
+            <X size={17} />
           </button>
         </div>
 
-        {/* Loading State */}
+        {/* Loading / Error States */}
         {loadingSession && (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
             <RefreshCw size={28} className="spinner-loader" style={{ margin: '0 auto 16px', color: '#004ecc' }} />
@@ -296,7 +394,6 @@ export default function PaymentPage() {
           </div>
         )}
 
-        {/* Error State */}
         {!loadingSession && sessionError && (
           <div style={{ textAlign: 'center', padding: '40px 20px' }}>
             <AlertCircle size={40} style={{ color: '#ef4444', margin: '0 auto 16px' }} />
@@ -315,7 +412,7 @@ export default function PaymentPage() {
           </div>
         )}
 
-        {/* Success Confirmation State */}
+        {/* Success Confirmation */}
         {!loadingSession && !sessionError && orderSuccess && (
           <div style={{ textAlign: 'center', padding: '20px 10px' }}>
             <div style={{
@@ -333,7 +430,6 @@ export default function PaymentPage() {
               Your transaction has been securely logged and is awaiting admin verification. Once verified, your subscription will be activated automatically.
             </p>
 
-            {/* Order Details Card */}
             <div style={{
               background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px',
               padding: '16px', textAlign: 'left', marginBottom: '24px', fontSize: '13px'
@@ -356,50 +452,41 @@ export default function PaymentPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Status</span>
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '4px',
-                  fontWeight: 800, color: '#d97706', fontSize: '11.5px'
-                }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 800, color: '#d97706', fontSize: '11.5px' }}>
                   <Clock size={12} /> PENDING ADMIN APPROVAL
                 </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = '/overview';
-                }}
-                style={{
-                  flex: 1, padding: '12px', borderRadius: '10px', background: '#004ecc', color: '#fff',
-                  border: 'none', fontWeight: 800, fontSize: '13.5px', cursor: 'pointer'
-                }}
-              >
-                Go to Dashboard
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => { window.location.href = '/overview'; }}
+              style={{
+                width: '100%', padding: '13px', borderRadius: '10px', background: '#004ecc', color: '#fff',
+                border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer'
+              }}
+            >
+              Go to Dashboard
+            </button>
           </div>
         )}
 
-        {/* Main Payment Interface */}
-        {!loadingSession && !sessionError && !orderSuccess && (
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* ── STEP 1: GATEWAY SELECTION (SCREENSHOT 1 REFERENCE) ─── */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {!loadingSession && !sessionError && !orderSuccess && currentStep === 'select_gateway' && (
           <div>
-            
-            {/* Header: Logo, Brand Name & Info Badges */}
+            {/* Header with Circular Logo, Habit Auth, and Action Badges */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '22px' }}>
-              {/* Circular Brand Logo */}
               <div style={{
                 width: '54px', height: '54px', borderRadius: '50%',
                 background: 'linear-gradient(135deg, #004ecc, #2563eb)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
-                flexShrink: 0
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)', flexShrink: 0
               }}>
                 <ShieldCheck size={28} color="#ffffff" />
               </div>
 
-              {/* Title & Quick Action Buttons */}
               <div>
                 <div style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.3px', color: '#0f172a', textTransform: 'uppercase' }}>
                   HABIT AUTH
@@ -448,14 +535,31 @@ export default function PaymentPage() {
               </div>
             </div>
 
-            {/* Expandable Quick Info Banners */}
+            {/* Support Modal Content */}
             {activeInfoModal === 'support' && (
               <div style={{
-                background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '12px',
-                padding: '12px 16px', marginBottom: '18px', fontSize: '12.5px', color: '#0369a1'
+                background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px',
+                padding: '14px 16px', marginBottom: '18px', fontSize: '12.5px', color: '#166534'
               }}>
-                <div style={{ fontWeight: 800, marginBottom: '4px' }}>Habit Auth Official Support:</div>
-                <div>পেমেন্ট নিয়ে যেকোনো সহায়তার জন্য আমাদের ডিসকর্ড সার্ভারে যোগাযোগ করুন অথবা এডমিনকে সরাসরি মেসেজ দিন।</div>
+                <div style={{ fontWeight: 800, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Headphones size={14} /> Habit Auth Official Support:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <a
+                    href="https://wa.me/8801939336831"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#15803d', fontWeight: 700, textDecoration: 'none' }}
+                  >
+                    <Phone size={13} /> WhatsApp: 01939336831
+                  </a>
+                  <a
+                    href="mailto:habitauthentication@gmail.com"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#15803d', fontWeight: 700, textDecoration: 'none' }}
+                  >
+                    <Mail size={13} /> Email: habitauthentication@gmail.com
+                  </a>
+                </div>
               </div>
             )}
 
@@ -483,25 +587,17 @@ export default function PaymentPage() {
               </div>
             )}
 
-            {/* Method Tabs Switcher matching screenshot: [ Mobile Banking ] [ International ] */}
+            {/* Pill Method Tabs: [ Mobile Banking ] [ International ] */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              background: '#e2e8f0',
-              padding: '4px',
-              borderRadius: '12px',
-              marginBottom: '20px'
+              display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#e2e8f0',
+              padding: '4px', borderRadius: '12px', marginBottom: '20px'
             }}>
               <button
                 type="button"
                 onClick={() => handleTabChange('mobile_banking')}
                 style={{
-                  padding: '10px 16px',
-                  borderRadius: '9px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  cursor: 'pointer',
+                  padding: '10px 16px', borderRadius: '9px', border: 'none',
+                  fontSize: '13px', fontWeight: 800, cursor: 'pointer',
                   background: activeTab === 'mobile_banking' ? '#004ecc' : 'transparent',
                   color: activeTab === 'mobile_banking' ? '#ffffff' : '#334155',
                   boxShadow: activeTab === 'mobile_banking' ? '0 4px 12px rgba(0, 78, 204, 0.25)' : 'none',
@@ -515,12 +611,8 @@ export default function PaymentPage() {
                 type="button"
                 onClick={() => handleTabChange('international')}
                 style={{
-                  padding: '10px 16px',
-                  borderRadius: '9px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  cursor: 'pointer',
+                  padding: '10px 16px', borderRadius: '9px', border: 'none',
+                  fontSize: '13px', fontWeight: 800, cursor: 'pointer',
                   background: activeTab === 'international' ? '#004ecc' : 'transparent',
                   color: activeTab === 'international' ? '#ffffff' : '#334155',
                   boxShadow: activeTab === 'international' ? '0 4px 12px rgba(0, 78, 204, 0.25)' : 'none',
@@ -531,164 +623,359 @@ export default function PaymentPage() {
               </button>
             </div>
 
-            {/* Gateways Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: activeTab === 'mobile_banking' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
+            {/* Gateway Cards Grid with Pure White Logos */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: activeTab === 'mobile_banking' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+              gap: '12px',
+              marginBottom: '24px'
+            }}>
               {activeTab === 'mobile_banking' ? (
                 <>
-                  {/* bKash */}
+                  {/* bKash Card */}
                   <div
-                    onClick={() => setSelectedGatewayId('bkash')}
+                    onClick={() => handleSelectGatewayAndProceed('bkash')}
                     style={{
                       border: selectedGatewayId === 'bkash' ? '2px solid #e2136e' : '1px solid #e2e8f0',
-                      background: selectedGatewayId === 'bkash' ? 'rgba(226, 19, 110, 0.04)' : '#ffffff',
-                      borderRadius: '12px', padding: '12px 8px', textAlign: 'center', cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      background: '#ffffff',
+                      borderRadius: '14px',
+                      padding: '14px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                     }}
                   >
-                    <div style={{ fontWeight: 900, color: '#e2136e', fontSize: '15px' }}>bKash</div>
-                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>bKash Personal</div>
+                    <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                      <img
+                        src="/gateways/bkash.png"
+                        alt="bKash"
+                        style={{ maxHeight: '34px', maxWidth: '85px', objectFit: 'contain', mixBlendMode: 'multiply' }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>bKash Personal</div>
                   </div>
 
-                  {/* Nagad */}
+                  {/* Nagad Card */}
                   <div
-                    onClick={() => setSelectedGatewayId('nagad')}
+                    onClick={() => handleSelectGatewayAndProceed('nagad')}
                     style={{
-                      border: selectedGatewayId === 'nagad' ? '2px solid #f97316' : '1px solid #e2e8f0',
-                      background: selectedGatewayId === 'nagad' ? 'rgba(249, 115, 22, 0.04)' : '#ffffff',
-                      borderRadius: '12px', padding: '12px 8px', textAlign: 'center', cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      border: selectedGatewayId === 'nagad' ? '2px solid #f7941d' : '1px solid #e2e8f0',
+                      background: '#ffffff',
+                      borderRadius: '14px',
+                      padding: '14px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                     }}
                   >
-                    <div style={{ fontWeight: 900, color: '#f97316', fontSize: '15px' }}>Nagad</div>
-                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>Nagad Personal</div>
+                    <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                      <img
+                        src="/gateways/nagad.png"
+                        alt="Nagad"
+                        style={{ maxHeight: '34px', maxWidth: '85px', objectFit: 'contain', mixBlendMode: 'multiply' }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>Nagad Personal</div>
                   </div>
 
-                  {/* Rocket */}
+                  {/* Rocket Card */}
                   <div
-                    onClick={() => setSelectedGatewayId('rocket')}
+                    onClick={() => handleSelectGatewayAndProceed('rocket')}
                     style={{
                       border: selectedGatewayId === 'rocket' ? '2px solid #8c3494' : '1px solid #e2e8f0',
-                      background: selectedGatewayId === 'rocket' ? 'rgba(140, 52, 148, 0.04)' : '#ffffff',
-                      borderRadius: '12px', padding: '12px 8px', textAlign: 'center', cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      background: '#ffffff',
+                      borderRadius: '14px',
+                      padding: '14px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                     }}
                   >
-                    <div style={{ fontWeight: 900, color: '#8c3494', fontSize: '15px' }}>Rocket</div>
-                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>Rocket Personal</div>
+                    <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                      <img
+                        src="/gateways/rocket.png"
+                        alt="Rocket"
+                        style={{ maxHeight: '34px', maxWidth: '85px', objectFit: 'contain', mixBlendMode: 'multiply' }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>Rocket Personal</div>
                   </div>
                 </>
               ) : (
                 <>
-                  {/* Binance Pay */}
+                  {/* Binance Pay Card */}
                   <div
-                    onClick={() => setSelectedGatewayId('binance_pay')}
+                    onClick={() => handleSelectGatewayAndProceed('binance_pay')}
                     style={{
                       border: selectedGatewayId === 'binance_pay' ? '2px solid #f59e0b' : '1px solid #e2e8f0',
-                      background: selectedGatewayId === 'binance_pay' ? 'rgba(245, 158, 11, 0.04)' : '#ffffff',
-                      borderRadius: '12px', padding: '12px 8px', textAlign: 'center', cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      background: '#ffffff',
+                      borderRadius: '14px',
+                      padding: '14px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                     }}
                   >
-                    <div style={{ fontWeight: 900, color: '#f59e0b', fontSize: '15px' }}>Binance Pay</div>
-                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>Pay ID (0 Fee)</div>
+                    <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                      <img
+                        src="/gateways/binance.svg"
+                        alt="Binance Pay"
+                        style={{ maxHeight: '32px', maxWidth: '32px' }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>Binance Pay</div>
+                    <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 600 }}>Pay ID (0 Fee)</div>
                   </div>
 
-                  {/* TRON (TRC-20) */}
+                  {/* TRON TRC20 Card */}
                   <div
-                    onClick={() => setSelectedGatewayId('trc20')}
+                    onClick={() => handleSelectGatewayAndProceed('trc20')}
                     style={{
                       border: selectedGatewayId === 'trc20' ? '2px solid #06b6d4' : '1px solid #e2e8f0',
-                      background: selectedGatewayId === 'trc20' ? 'rgba(6, 182, 212, 0.04)' : '#ffffff',
-                      borderRadius: '12px', padding: '12px 8px', textAlign: 'center', cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      background: '#ffffff',
+                      borderRadius: '14px',
+                      padding: '14px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                     }}
                   >
-                    <div style={{ fontWeight: 900, color: '#06b6d4', fontSize: '15px' }}>TRON TRC20</div>
-                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>USDT / TRX</div>
+                    <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                      <img
+                        src="/gateways/tron.svg"
+                        alt="TRON"
+                        style={{ maxHeight: '32px', maxWidth: '32px' }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>TRON TRC20</div>
+                    <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 600 }}>USDT / TRX</div>
                   </div>
                 </>
               )}
             </div>
 
-            {/* Gateway Transfer Info Box */}
-            <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '14px',
-              padding: '16px',
-              marginBottom: '20px'
-            }}>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>
-                {activeGateway.name} {activeGateway.accountType || 'Account'}
+            {/* Bottom Proceed Action Button */}
+            <button
+              type="button"
+              onClick={() => handleSelectGatewayAndProceed(selectedGatewayId)}
+              style={{
+                width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
+                background: '#dbeafe', color: '#1d4ed8', fontSize: '15px', fontWeight: 900,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                transition: 'all 0.2s ease', boxShadow: '0 4px 12px rgba(29, 78, 216, 0.12)'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#004ecc'; e.currentTarget.style.color = '#ffffff'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.color = '#1d4ed8'; }}
+            >
+              <span>Pay {finalPrice} {currency}</span>
+            </button>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* ── STEP 2: PAYMENT VERIFICATION (SCREENSHOT 1 EXACT) ──── */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {!loadingSession && !sessionError && !orderSuccess && currentStep === 'enter_transaction' && (
+          <div>
+            {/* Top Brand & Invoice Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #004ecc, #2563eb)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <ShieldCheck size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase' }}>
+                    HABIT AUTH
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>INVOICE</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{sessionId.slice(0, 8)}...</span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(sessionId, 'inv')}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#94a3b8' }}
+                    >
+                      {copiedKey === 'inv' ? <Check size={11} color="#10b981" /> : <Copy size={11} />}
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <span style={{
-                  fontFamily: 'monospace',
-                  fontSize: activeGateway.payId ? '18px' : activeGateway.number?.length > 20 ? '12px' : '17px',
-                  fontWeight: 800,
-                  color: '#0f172a',
-                  wordBreak: 'break-all'
-                }}>
-                  {activeGateway.payId || activeGateway.number || activeGateway.address}
+              {/* Amount Badge */}
+              <div style={{
+                fontSize: '18px', fontWeight: 900, color: '#0f172a',
+                padding: '6px 14px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0'
+              }}>
+                {currency === 'BDT' ? `৳ ${finalPrice}` : `$ ${finalPrice}`}
+              </div>
+            </div>
+
+            {/* Selected Gateway Logo in Center with pure white background */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              height: '56px', background: '#ffffff', borderRadius: '12px', marginBottom: '14px'
+            }}>
+              {selectedGatewayId === 'bkash' && (
+                <img src="/gateways/bkash.png" alt="bKash" style={{ maxHeight: '42px', maxWidth: '140px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+              )}
+              {selectedGatewayId === 'nagad' && (
+                <img src="/gateways/nagad.png" alt="Nagad" style={{ maxHeight: '42px', maxWidth: '140px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+              )}
+              {selectedGatewayId === 'rocket' && (
+                <img src="/gateways/rocket.png" alt="Rocket" style={{ maxHeight: '42px', maxWidth: '140px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+              )}
+              {selectedGatewayId === 'binance_pay' && (
+                <img src="/gateways/binance.svg" alt="Binance" style={{ maxHeight: '40px', maxWidth: '40px' }} />
+              )}
+              {selectedGatewayId === 'trc20' && (
+                <img src="/gateways/tron.svg" alt="TRON" style={{ maxHeight: '40px', maxWidth: '40px' }} />
+              )}
+            </div>
+
+            {/* Yellow advice bar from screenshot */}
+            <div style={{
+              background: '#fefce8', border: '1px solid #fef08a', borderRadius: '8px',
+              padding: '8px 12px', textAlign: 'center', fontSize: '11.5px', color: '#854d0e',
+              fontWeight: 700, marginBottom: '14px'
+            }}>
+              নোটঃ টাকা পাঠানোর ৫-১৫ সেকেন্ড পর ভেরিফাই করবেন।
+            </div>
+
+            {/* ── GATEWAY-THEMED CARD (MATCHING SCREENSHOT 1) ── */}
+            <div style={{
+              background: gatewayTheme.primary,
+              borderRadius: '16px',
+              padding: '20px',
+              color: '#ffffff',
+              marginBottom: '20px',
+              boxShadow: `0 10px 25px -5px ${gatewayTheme.primary}55`
+            }}>
+              {/* Title */}
+              <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 800, marginBottom: '12px' }}>
+                ট্রানজেকশন আইডি দিন
+              </div>
+
+              {/* Large Input for TrxID */}
+              <div style={{ marginBottom: '16px' }}>
+                <input
+                  type="text"
+                  value={trxId}
+                  onChange={(e) => setTrxId(e.target.value.toUpperCase())}
+                  placeholder="ট্রানজেকশন আইডি দিন"
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '13px 16px', borderRadius: '10px',
+                    border: 'none', fontSize: '14px', fontWeight: 800,
+                    fontFamily: 'monospace', textAlign: 'center',
+                    background: '#ffffff', color: '#0f172a',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                  required
+                />
+              </div>
+
+              {/* Sender mobile / ID input */}
+              <div style={{ marginBottom: '16px' }}>
+                <input
+                  type="text"
+                  value={senderNumber}
+                  onChange={(e) => setSenderNumber(e.target.value)}
+                  placeholder={activeTab === 'mobile_banking' ? "আপনার প্রেরক মোবাইল নম্বর লিখুন" : "আপনার Binance Pay ID / Wallet Address"}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '11px 16px', borderRadius: '10px',
+                    border: 'none', fontSize: '12.5px', fontWeight: 700,
+                    fontFamily: 'monospace', textAlign: 'center',
+                    background: 'rgba(255, 255, 255, 0.95)', color: '#0f172a'
+                  }}
+                  required
+                />
+              </div>
+
+              {/* Instructions Header with Show QR button */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '8px' }}>
+                <span style={{ fontSize: '11.5px', fontWeight: 800, letterSpacing: '0.5px' }}>
+                  INSTRUCTIONS
                 </span>
 
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(activeGateway.payId || activeGateway.number || activeGateway.address, 'target')}
+                  onClick={() => setActiveInfoModal(activeInfoModal === 'qr' ? null : 'qr')}
                   style={{
-                    background: copiedKey === 'target' ? '#10b981' : '#004ecc',
-                    color: '#fff', border: 'none', borderRadius: '8px',
-                    padding: '6px 12px', fontSize: '11.5px', fontWeight: 800,
-                    cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    flexShrink: 0
+                    background: 'rgba(255, 255, 255, 0.25)', border: 'none', borderRadius: '6px',
+                    padding: '4px 10px', fontSize: '10.5px', fontWeight: 800, color: '#ffffff',
+                    cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px'
                   }}
                 >
-                  {copiedKey === 'target' ? <Check size={13} /> : <Copy size={13} />}
-                  <span>{copiedKey === 'target' ? 'Copied' : 'Copy'}</span>
+                  <QrCode size={11} />
+                  <span>Show QR</span>
                 </button>
               </div>
 
-              <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '8px', lineHeight: 1.5 }}>
-                {activeGateway.instructions}
+              {/* QR Code Popup */}
+              {activeInfoModal === 'qr' && (
+                <div style={{
+                  background: '#ffffff', borderRadius: '10px', padding: '14px',
+                  textAlign: 'center', color: '#0f172a', marginBottom: '14px'
+                }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, marginBottom: '8px' }}>Scan with Binance / TRON Wallet</div>
+                  <img src="/binance-qr.png" alt="QR" style={{ width: '140px', height: '140px', objectFit: 'contain' }} />
+                </div>
+              )}
+
+              {/* Instruction Bullet Points matching screenshot */}
+              <div style={{ fontSize: '12px', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>• {gatewayTheme.code} ডায়াল করে আপনার {gatewayTheme.name} মোবাইল মেনুতে যান অথবা {gatewayTheme.name} অ্যাপে যান</div>
+                <div>• "Send Money"-এ ক্লিক করুন।</div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span>• প্রাপক নম্বর হিসাবে এই নম্বরটি লিখুন: <strong>{activeGateway.number || activeGateway.payId || activeGateway.address}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(activeGateway.number || activeGateway.payId || activeGateway.address, 'boxNum')}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.95)', border: 'none', borderRadius: '6px',
+                      padding: '2px 8px', fontSize: '10.5px', fontWeight: 800, color: gatewayTheme.primary,
+                      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                    }}
+                  >
+                    {copiedKey === 'boxNum' ? <Check size={10} /> : <Copy size={10} />}
+                    <span>{copiedKey === 'boxNum' ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+
+                <div>• পরিমাণ: <strong>{finalPrice} {currency}</strong> দিয়ে SUBMIT করুন।</div>
+                <div>• সফল উত্তরের মেসেজের Transaction ID দিন এবং VERIFY করুন।</div>
               </div>
             </div>
 
-            {/* Coupon Code Section */}
+            {/* Optional Coupon Box */}
             <div style={{ marginBottom: '18px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <Tag size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="Enter Coupon Code (Optional)"
-                    disabled={!!appliedCoupon}
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      padding: '10px 12px 10px 34px',
-                      borderRadius: '10px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '12.5px',
-                      fontFamily: 'monospace',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      color: '#0f172a'
-                    }}
-                  />
-                </div>
-
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="কুপন কোড (যদি থাকে)"
+                  disabled={!!appliedCoupon}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1',
+                    fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, textTransform: 'uppercase'
+                  }}
+                />
                 {appliedCoupon ? (
                   <button
                     type="button"
                     onClick={handleRemoveCoupon}
-                    style={{
-                      padding: '0 16px', borderRadius: '10px',
-                      background: '#fee2e2', color: '#ef4444',
-                      border: '1px solid #fca5a5', fontWeight: 700,
-                      fontSize: '12px', cursor: 'pointer'
-                    }}
+                    style={{ padding: '0 14px', borderRadius: '10px', background: '#fee2e2', color: '#ef4444', border: 'none', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
                   >
                     Remove
                   </button>
@@ -697,12 +984,7 @@ export default function PaymentPage() {
                     type="button"
                     onClick={handleApplyCoupon}
                     disabled={validatingCoupon || !couponCode.trim()}
-                    style={{
-                      padding: '0 16px', borderRadius: '10px',
-                      background: '#004ecc', color: '#fff',
-                      border: 'none', fontWeight: 800,
-                      fontSize: '12px', cursor: 'pointer'
-                    }}
+                    style={{ padding: '0 16px', borderRadius: '10px', background: '#004ecc', color: '#fff', border: 'none', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
                   >
                     {validatingCoupon ? 'Checking...' : 'Apply'}
                   </button>
@@ -710,66 +992,13 @@ export default function PaymentPage() {
               </div>
 
               {couponError && (
-                <div style={{ fontSize: '11.5px', color: '#ef4444', marginTop: '6px', fontWeight: 600 }}>
-                  {couponError}
-                </div>
+                <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px', fontWeight: 600 }}>{couponError}</div>
               )}
-
               {appliedCoupon && (
-                <div style={{
-                  marginTop: '8px', padding: '6px 10px', background: 'rgba(16, 185, 129, 0.1)',
-                  borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.25)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-                }}>
-                  <span style={{ fontSize: '11.5px', color: '#059669', fontWeight: 700 }}>
-                    {appliedCoupon.discount_percent}% DISCOUNT APPLIED
-                  </span>
-                  <span style={{ fontSize: '11.5px', color: '#64748b' }}>
-                    Code: <strong>{appliedCoupon.code}</strong>
-                  </span>
+                <div style={{ fontSize: '11.5px', color: '#059669', marginTop: '6px', fontWeight: 700 }}>
+                  {appliedCoupon.discount_percent}% Discount Applied!
                 </div>
               )}
-            </div>
-
-            {/* Inputs: Sender Number and TrxID */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  {activeTab === 'mobile_banking' ? 'Your Mobile Number' : 'Your Binance Pay ID / Wallet Address'}
-                </label>
-                <input
-                  type="text"
-                  value={senderNumber}
-                  onChange={(e) => setSenderNumber(e.target.value)}
-                  placeholder={activeTab === 'mobile_banking' ? 'e.g. 017xxxxxxxx or 019xxxxxxxx' : 'e.g. 1025707697'}
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    padding: '11px 12px', borderRadius: '10px',
-                    border: '1px solid #cbd5e1', fontSize: '13px',
-                    fontFamily: 'monospace', fontWeight: 600
-                  }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Transaction ID (TrxID / TxID)
-                </label>
-                <input
-                  type="text"
-                  value={trxId}
-                  onChange={(e) => setTrxId(e.target.value)}
-                  placeholder="Paste the 8-10 digit TrxID from your SMS receipt"
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    padding: '11px 12px', borderRadius: '10px',
-                    border: '1px solid #cbd5e1', fontSize: '13px',
-                    fontFamily: 'monospace', fontWeight: 700, color: '#004ecc'
-                  }}
-                  required
-                />
-              </div>
             </div>
 
             {submitError && (
@@ -783,67 +1012,42 @@ export default function PaymentPage() {
               </div>
             )}
 
-            {/* Pay Button matching user screenshot: Pay 129 BDT */}
+            {/* Bottom VERIFY TRANSACTION Button matching screenshot */}
             <button
               type="button"
               disabled={submitting}
               onClick={handleSubmitPayment}
               style={{
                 width: '100%',
-                padding: '14px',
+                padding: '15px',
                 borderRadius: '12px',
                 border: 'none',
-                background: '#dbeafe',
-                color: '#1d4ed8',
+                background: gatewayTheme.primary,
+                color: '#ffffff',
                 fontSize: '15px',
                 fontWeight: 900,
+                letterSpacing: '0.5px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px rgba(29, 78, 216, 0.12)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#004ecc';
-                e.currentTarget.style.color = '#ffffff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#dbeafe';
-                e.currentTarget.style.color = '#1d4ed8';
+                boxShadow: `0 8px 20px ${gatewayTheme.primary}66`
               }}
             >
               {submitting ? (
                 <>
                   <RefreshCw size={16} className="spinner-loader" />
-                  <span>Submitting Order...</span>
+                  <span>VERIFYING TRANSACTION...</span>
                 </>
               ) : (
-                <>
-                  {appliedCoupon && (
-                    <span style={{ textDecoration: 'line-through', opacity: 0.6, fontSize: '13px', marginRight: '4px' }}>
-                      {basePrice} {currency}
-                    </span>
-                  )}
-                  <span>Pay {finalPrice} {currency}</span>
-                </>
+                <span>VERIFY TRANSACTION</span>
               )}
             </button>
-
-            <div style={{
-              fontSize: '11px', color: '#94a3b8', textAlign: 'center',
-              marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-            }}>
-              <ShieldCheck size={13} color="#10b981" />
-              <span>Habit Auth End-to-End Encrypted Verification</span>
-            </div>
-
           </div>
         )}
 
       </div>
-
     </div>
   );
 }
