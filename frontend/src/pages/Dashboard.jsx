@@ -5184,34 +5184,33 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>
                       {liveUsers.length === 0 
                         ? 'Radar Active • Listening for client heartbeats (0 desktop clients connected). When users run your software, they appear here live.' 
-                        : 'Real-time telemetry heartbeat (every 60s). Click "Kill" on any user to remotely terminate their session.'}
+                        : 'Real-time telemetry heartbeat active. Open the Live Radar tab to inspect connected client sessions.'}
                     </span>
                   </div>
                 </div>
 
-                {liveUsers.length > 0 && (
-                  <div className="flex-align" style={{ gap: '8px', flexWrap: 'wrap' }}>
-                    {liveUsers.slice(0, 5).map(lu => (
-                      <span 
-                        key={lu.id} 
-                        className="badge" 
-                        style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        @{lu.username}
-                        <button 
-                          onClick={() => handleKillSession(lu.id, lu.username)}
-                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
-                          title={`Kill session for @${lu.username}`}
-                        >
-                          <Zap size={11} />
-                        </button>
-                      </span>
-                    ))}
-                    {liveUsers.length > 5 && (
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>+{liveUsers.length - 5} more</span>
-                    )}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveNav('radar')}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    color: '#4ade80',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Radio size={13} />
+                  <span>View in Live Radar</span>
+                  <ArrowRight size={12} />
+                </button>
               </div>
             )}
 
