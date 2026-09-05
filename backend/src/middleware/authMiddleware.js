@@ -85,7 +85,7 @@ export function authenticateUser(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (req.user?.role !== 'admin') {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'owner') {
     return res.status(403).json({ success: false, message: 'Access denied. Administrator privileges required.' });
   }
   next();
@@ -97,8 +97,8 @@ export function checkMaintenanceMode(req, res, next) {
     return next();
   }
 
-  // Super Admins are exempt to manage or fix systems
-  if (req.user?.role === 'admin') {
+  // Super Admins and Owners are exempt to manage or fix systems
+  if (req.user?.role === 'admin' || req.user?.role === 'owner') {
     return next();
   }
 

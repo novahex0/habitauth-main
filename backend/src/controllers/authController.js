@@ -121,8 +121,8 @@ export async function discordCallback(req, res) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
       `).run(newId, discordUser.id, discordUser.username, discordUser.email || null, avatar, role, now, now, now);
 
-      // Initialize Subscription: Developer Plan for Owner/Admin, Free for User
-      const initPlan = (isOwner || isAdmin) ? 'developer' : 'free';
+      // Initialize Subscription: Pro Plan for Owner/Admin, Free for User
+      const initPlan = (isOwner || isAdmin) ? 'pro' : 'free';
       db.prepare(`
         INSERT INTO subscriptions (id, user_id, plan, status, started_at, expires_at, provider, created_at)
         VALUES (?, ?, ?, 'active', ?, 0, 'discord', ?)
@@ -140,6 +140,10 @@ export async function discordCallback(req, res) {
       db.prepare('UPDATE accounts SET username = ?, avatar = ?, role = ?, updated_at = ? WHERE id = ?')
         .run(discordUser.username, avatar, targetRole, now, account.id);
       account.role = targetRole;
+
+      if (isOwner || isAdmin) {
+        db.prepare("UPDATE subscriptions SET plan = 'pro', status = 'active' WHERE user_id = ?").run(account.id);
+      }
     }
 
     if (account.status === 'banned') {

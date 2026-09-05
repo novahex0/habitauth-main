@@ -464,7 +464,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
   });
   const [isSavingSec, setIsSavingSec] = useState(false);
   const [systemMaintenance, setSystemMaintenance] = useState({ active: false, message: '' });
-  const isMaintenanceLocked = systemMaintenance.active && user?.role !== 'admin';
+  const isMaintenanceLocked = systemMaintenance.active && user?.role !== 'admin' && user?.role !== 'owner';
 
   const [adminSystemConfig, setAdminSystemConfig] = useState({
     maintenance_mode: false,
@@ -817,7 +817,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
   // Fetch Locked Users & Admin Data
   const fetchAdminData = async () => {
-    if (user?.role !== 'admin') return;
+    if (user?.role !== 'admin' && user?.role !== 'owner') return;
     try {
       const [sRes, aRes, lRes, logRes, appRes, uRes, licRes, tRes, sysRes] = await Promise.all([
         fetch('/api/v1/admin/stats', { headers: getHeaders() }),
@@ -990,7 +990,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
   };
 
   const handleUpdateTicketStatus = async (ticketId, status) => {
-    if (currentUser?.role !== 'admin') {
+    if (currentUser?.role !== 'admin' && currentUser?.role !== 'owner') {
       showToast('Permission Denied: Only administrators can update ticket status.');
       return;
     }
@@ -2783,7 +2783,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
   };
 
   const fetchDatabaseStats = async () => {
-    if (user?.role !== 'admin') return;
+    if (user?.role !== 'admin' && user?.role !== 'owner') return;
     setLoadingDbStats(true);
     try {
       const res = await fetch('/api/v1/admin/database/stats', { headers: getHeaders() });
@@ -2996,7 +2996,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
   const activeUser = currentUser || user;
   const currentPlan = activeUser?.plan || 'free';
-  const isSuperAdmin = activeUser?.role === 'admin';
+  const isSuperAdmin = activeUser?.role === 'admin' || activeUser?.role === 'owner';
   const isExpired = activeUser?.sub_status === 'expired';
   const isFreePlan = (currentPlan === 'free' && !isSuperAdmin) || isExpired;
   const isDevPlan = currentPlan === 'developer' && !isSuperAdmin && !isExpired;
@@ -3058,35 +3058,25 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
     <div className={`dashboard-container ${mobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
       <div className="dashboard-bg-glow"></div>
 
-      {/* ── MOBILE STICKY HEADER ─────────────────────────────── */}
+      {/* ── MOBILE NAVBAR HEADER ───────────────────────────────── */}
       <header className="mobile-header">
-        <button
-          type="button"
-          className="mobile-menu-toggle-btn"
-          onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-          aria-label="Toggle Mobile Navigation Drawer"
-        >
-          {mobileSidebarOpen ? <X size={22} color="#ffffff" /> : <Menu size={22} color="#ffffff" />}
-        </button>
-
-        <div 
-          className="mobile-brand-title"
-          onClick={() => {
-            setMobileSidebarOpen(false);
-            if (onBackToLanding) onBackToLanding();
-            else window.location.href = '/';
-          }}
-          style={{ cursor: 'pointer' }}
-        >
-          HABIT AUTH
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button 
+            className="mobile-menu-btn" 
+            onClick={() => setMobileSidebarOpen(true)}
+            aria-label="Open Navigation Menu"
+          >
+            <Menu size={20} />
+          </button>
+          <span style={{ fontWeight: 800, fontSize: '16px', letterSpacing: '0.5px' }}>
+            HABIT AUTH
+          </span>
         </div>
 
-        <div className="mobile-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {/* Mobile Language Switcher Pill */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Mobile Language Switcher */}
           <button
-            type="button"
-            className="mobile-header-lang-btn"
-            onClick={() => setLangDropdownOpen(true)}
+            onClick={switchLanguage}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -3100,7 +3090,6 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               cursor: 'pointer',
               lineHeight: 1
             }}
-            title={t('switchLang')}
           >
             <Globe size={12} color="#60a5fa" />
             <span style={{ fontSize: '13px' }}>{currentLanguageObj?.flag}</span>
@@ -3116,8 +3105,8 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               <Crown size={12} fill="#f59e0b" /> $1.20/mo
             </button>
           ) : (
-            <span className="badge badge-success" style={{ fontSize: '10px' }}>
-              {currentUser?.plan?.toUpperCase() || 'PRO'}
+            <span className={`badge ${isSuperAdmin ? 'badge-danger' : 'badge-success'}`} style={{ fontSize: '10px' }}>
+              {isSuperAdmin ? (activeUser?.role === 'owner' ? 'OWNER' : 'ADMIN') : (currentUser?.plan?.toUpperCase() || 'PRO')}
             </span>
           )}
         </div>
@@ -3399,7 +3388,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
             )}
           </li>
 
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'owner') && (
             <>
               <div className="nav-section-label" style={{ color: 'var(--danger)' }}>{t('dashAdministration')}</div>
               <li className={`nav-item ${activeNav === 'admin' ? 'active' : ''}`} onClick={() => setActiveNav('admin')} style={{ color: '#f87171' }}>
@@ -3445,9 +3434,12 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user?.username}
               </div>
-              <div style={{ fontSize: '10px', color: isProPlan ? '#f59e0b' : isDevPlan ? '#38bdf8' : 'var(--primary-light)', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {isProPlan && <Crown size={11} fill="#f59e0b" />}
-                {(currentUser || user)?.plan} PLAN
+              <div style={{ fontSize: '10px', color: (isSuperAdmin || isProPlan) ? '#f59e0b' : isDevPlan ? '#38bdf8' : 'var(--primary-light)', fontWeight: 800, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {(isSuperAdmin || isProPlan) && <Crown size={11} fill="#f59e0b" />}
+                {isSuperAdmin 
+                  ? (activeUser?.role === 'owner' ? 'OWNER (PRO)' : 'ADMIN (PRO)') 
+                  : `${(currentUser || user)?.plan || 'FREE'} PLAN`
+                }
               </div>
             </div>
           </div>
@@ -8241,7 +8233,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
         )}
 
         {/* ── 11. SUPER ADMIN RADAR TAB (MASTER OVERSIGHT) ─────── */}
-        {activeNav === 'admin' && user?.role === 'admin' && (
+        {activeNav === 'admin' && (user?.role === 'admin' || user?.role === 'owner') && (
           <div className="animate-slide-up">
             <header className="content-header">
               <div>

@@ -405,14 +405,17 @@ export function initDatabase() {
     if (!owner) {
       db.prepare(`
         INSERT INTO accounts (id, discord_id, username, email, avatar, role, created_at, updated_at, status)
-        VALUES ('usr_c0049143710d4e5c', '1281266486601715834', 'meherab009', 'bappyxcheat@gmail.com', 'https://cdn.discordapp.com/avatars/1281266486601715834/d71403e45350fb26a3270b20df95e8df.png', 'admin', 1788558076, 1788558076, 'active')
+        VALUES ('usr_c0049143710d4e5c', '1281266486601715834', 'meherab009', 'bappyxcheat@gmail.com', 'https://cdn.discordapp.com/avatars/1281266486601715834/d71403e45350fb26a3270b20df95e8df.png', 'owner', 1788558076, 1788558076, 'active')
       `).run();
 
       db.prepare(`
         INSERT OR REPLACE INTO subscriptions (id, user_id, plan, status, started_at, expires_at, provider, created_at)
-        VALUES ('sub_b9bf6ca6-79d', 'usr_c0049143710d4e5c', 'developer', 'active', 1788558076, 0, 'discord', 1788558076)
+        VALUES ('sub_b9bf6ca6-79d', 'usr_c0049143710d4e5c', 'pro', 'active', 1788558076, 0, 'discord', 1788558076)
       `).run();
       console.log('👑 Master Owner account (meherab009) initialized successfully.');
+    } else {
+      db.prepare("UPDATE accounts SET role = 'owner' WHERE id = ?").run(owner.id);
+      db.prepare("UPDATE subscriptions SET plan = 'pro', status = 'active' WHERE user_id = ?").run(owner.id);
     }
   } catch (e) {
     console.error('Owner seed error:', e);
