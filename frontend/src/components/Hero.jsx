@@ -128,7 +128,12 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
           <div className="obsidian-hero-left obsidian-reveal is-visible">
             
             {/* Live Operational Pill Badge */}
-            <div className="obsidian-badge">
+            <div className="obsidian-badge" style={{ paddingLeft: '8px', gap: '8px' }}>
+              <img 
+                src="/logo.png" 
+                alt="Habit Auth Logo" 
+                style={{ width: '18px', height: '18px', objectFit: 'contain' }} 
+              />
               <span className="obsidian-badge-dot" />
               <span>Now securing 14.8K+ applications & machines</span>
             </div>
@@ -315,7 +320,12 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                  <span style={{ marginLeft: '10px', fontSize: '11.5px', color: '#94a3b8', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                  <img 
+                    src="/logo.png" 
+                    alt="Habit Auth Logo" 
+                    style={{ width: '15px', height: '15px', objectFit: 'contain', marginLeft: '8px' }} 
+                  />
+                  <span style={{ marginLeft: '6px', fontSize: '11.5px', color: '#94a3b8', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                     habit-auth-radar.control-center
                   </span>
                 </div>

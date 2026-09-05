@@ -1114,19 +1114,16 @@ export default function Documentation({ onBack, onOpenDashboard, onNavigate, ini
 
           {/* Logo & Brand */}
           <div className="docs-brand" onClick={onBack}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '9px',
-              background: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 16px rgba(37, 99, 235, 0.45)',
-              color: '#ffffff'
-            }}>
-              <Shield size={18} />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Habit Auth Logo" 
+              style={{
+                width: '32px',
+                height: '32px',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 0 10px rgba(56, 189, 248, 0.5))'
+              }}
+            />
             <span className="docs-brand-name">Habit Auth</span>
             <span className="docs-brand-badge">{dt.brandBadge || 'Docs v1.4'}</span>
           </div>

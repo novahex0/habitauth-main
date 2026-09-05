@@ -103,6 +103,17 @@ export default function Navbar({ user, onOpenLogin, onLogout, onNavigate, curren
           onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
           onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
         >
+          <img 
+            src="/logo.png" 
+            alt="Habit Auth Logo" 
+            style={{ 
+              width: '32px', 
+              height: '32px', 
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 0 10px rgba(56, 189, 248, 0.45))',
+              marginRight: '10px'
+            }} 
+          />
           <span style={{
             fontSize: '18px',
             fontWeight: 800,

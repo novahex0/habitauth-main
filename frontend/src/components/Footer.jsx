@@ -60,8 +60,18 @@ export default function Footer({ onNavigate }) {
           
           {/* Column 1: Brand, Description, Socials */}
           <div>
-            {/* Logo without Shield Icon */}
+            {/* Official Logo & Brand */}
             <div className="flex-align" style={{ gap: '10px', marginBottom: '16px' }}>
+              <img 
+                src="/logo.png" 
+                alt="Habit Auth Logo" 
+                style={{ 
+                  width: '30px', 
+                  height: '30px', 
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 0 10px rgba(56, 189, 248, 0.5))' 
+                }} 
+              />
               <span style={{ fontSize: '20px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.3px' }}>
                 Habit Auth
               </span>

@@ -3198,9 +3198,20 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               e.currentTarget.style.filter = 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.4))';
             }}
           >
+            <img 
+              src="/logo.png" 
+              alt="Habit Auth Logo" 
+              style={{ 
+                width: '46px', 
+                height: '46px', 
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 0 16px rgba(56, 189, 248, 0.65))',
+                marginBottom: '10px'
+              }} 
+            />
             <div style={{
               fontFamily: "'Outfit', 'Space Grotesk', system-ui, -apple-system, sans-serif",
-              fontSize: '23px',
+              fontSize: '21px',
               fontWeight: 900,
               letterSpacing: '2.5px',
               background: 'linear-gradient(135deg, #ffffff 0%, #e0f2fe 35%, #93c5fd 70%, #3b82f6 100%)',

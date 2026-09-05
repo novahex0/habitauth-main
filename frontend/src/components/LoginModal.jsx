@@ -321,6 +321,21 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
         ) : (
           /* ── CASE 3: STANDARD SIGN IN / SIGN UP MODAL ─────── */
           <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+              <img 
+                src="/logo.png" 
+                alt="Habit Auth Logo" 
+                style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 0 14px rgba(56, 189, 248, 0.6))' 
+                }} 
+              />
+              <span style={{ fontSize: '18px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.3px' }}>
+                Habit Auth
+              </span>
+            </div>
             <h3 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.5px', marginBottom: '6px' }}>
               {activeTab === 'signin' ? 'Sign In to Habit Auth' : 'Create Developer Account'}
             </h3>
