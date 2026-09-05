@@ -49,6 +49,9 @@ import {
 import { 
   getBlacklists, addBlacklist, removeBlacklist 
 } from '../controllers/blacklistController.js';
+import { 
+  getCryptoConfig, verifyCryptoPayment 
+} from '../controllers/paymentController.js';
 
 import { authenticateUser, requireAdmin, checkMaintenanceMode } from '../middleware/authMiddleware.js';
 import { checkAppLimit, checkUserLimit } from '../middleware/helpers.js';
@@ -242,5 +245,9 @@ router.get('/audit-logs/retention', authenticateUser, getAuditLogRetention);
 router.post('/audit-logs/purge', authenticateUser, purgeAuditLogs);
 router.post('/audit-logs/retention/simulate', authenticateUser, simulateRetentionDay);
 router.get('/audit-logs/export', authenticateUser, exportAuditLogsBackup);
+
+// ── 11. WEB3 & BINANCE CRYPTO CHECKOUT ───────────────────────
+router.get('/payment/config', getCryptoConfig);
+router.post('/payment/verify-crypto', authenticateUser, verifyCryptoPayment);
 
 export default router;

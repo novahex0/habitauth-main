@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Pricing from './components/Pricing';
-import DiscordPurchaseModal from './components/DiscordPurchaseModal';
+import CryptoCheckoutModal from './components/CryptoCheckoutModal';
 import LoginModal from './components/LoginModal';
 import PasswordResetModal from './components/PasswordResetModal';
 import Dashboard from './pages/Dashboard';
@@ -201,6 +201,12 @@ export default function App() {
     setPurchaseModalOpen(true);
   };
 
+  const handleUpgradeSuccess = (paymentResult) => {
+    if (paymentResult?.user) {
+      setUser(prev => ({ ...prev, ...paymentResult.user, plan: paymentResult.plan, role: 'developer' }));
+    }
+  };
+
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname.toLowerCase();
@@ -273,10 +279,13 @@ export default function App() {
           }}
         />
 
-        <DiscordPurchaseModal
+        <CryptoCheckoutModal
           isOpen={purchaseModalOpen}
           onClose={() => setPurchaseModalOpen(false)}
           selectedPlan={selectedPlanForPurchase}
+          user={user}
+          onUpgradeSuccess={handleUpgradeSuccess}
+          onOpenLogin={handleOpenLogin}
         />
       </div>
     );
@@ -318,10 +327,13 @@ export default function App() {
           }}
         />
 
-        <DiscordPurchaseModal
+        <CryptoCheckoutModal
           isOpen={purchaseModalOpen}
           onClose={() => setPurchaseModalOpen(false)}
           selectedPlan={selectedPlanForPurchase}
+          user={user}
+          onUpgradeSuccess={handleUpgradeSuccess}
+          onOpenLogin={handleOpenLogin}
         />
       </div>
     );
@@ -390,10 +402,13 @@ export default function App() {
         }}
       />
 
-      <DiscordPurchaseModal
+      <CryptoCheckoutModal
         isOpen={purchaseModalOpen}
         onClose={() => setPurchaseModalOpen(false)}
         selectedPlan={selectedPlanForPurchase}
+        user={user}
+        onUpgradeSuccess={handleUpgradeSuccess}
+        onOpenLogin={handleOpenLogin}
       />
     </div>
   );

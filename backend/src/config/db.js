@@ -265,6 +265,22 @@ export function initDatabase() {
       created_at INTEGER NOT NULL
     );
 
+    -- 19. Crypto Payments (Web3 & Binance Auto-Verification)
+    CREATE TABLE IF NOT EXISTS crypto_payments (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      plan TEXT NOT NULL,
+      billing_cycle TEXT NOT NULL,
+      amount REAL NOT NULL,
+      currency TEXT NOT NULL,
+      txid TEXT UNIQUE NOT NULL,
+      from_address TEXT,
+      to_address TEXT NOT NULL,
+      status TEXT DEFAULT 'completed',
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
+    );
+
     -- Performance Indexes
     CREATE INDEX IF NOT EXISTS idx_accounts_discord ON accounts(discord_id);
     CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_id);
@@ -276,6 +292,8 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_tickets_app ON tickets(app_id);
     CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_id);
     CREATE INDEX IF NOT EXISTS idx_blacklists_lookup ON blacklists(type, value);
+    CREATE INDEX IF NOT EXISTS idx_crypto_payments_txid ON crypto_payments(txid);
+    CREATE INDEX IF NOT EXISTS idx_crypto_payments_user ON crypto_payments(user_id);
   `);
 
   // Auto-migrate new columns if existing SQLite DB was already created
@@ -439,4 +457,5 @@ export function generateEd25519Keypair() {
   };
 }
 
+export { db };
 export default db;

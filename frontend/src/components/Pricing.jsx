@@ -49,11 +49,11 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
           'Official C#, C++, Python, JS SDKs',
           'Standard community support'
         ],
-        ctaText: 'Subscribe with Discord',
+        ctaText: 'Upgrade with Crypto / Pay',
         popular: true,
         isFree: false,
         highlight: true,
-        guarantee: 'Instant Discord delivery • Cancel anytime'
+        guarantee: 'Instant Binance / Web3 delivery • 0 KYC'
       },
       {
         id: 'pro',
@@ -77,7 +77,7 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
         popular: false,
         isFree: false,
         highlight: false,
-        guarantee: 'Commercial scale • Instant Discord delivery'
+        guarantee: 'Commercial scale • Instant Binance / Web3 delivery • 0 KYC'
       }
     ],
     bn: [
@@ -121,11 +121,11 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
           'অফিসিয়াল C#, C++, Python, JS SDKs',
           'স্ট্যান্ডার্ড কমিউনিটি সাপোর্ট'
         ],
-        ctaText: 'ডিসকর্ডের মাধ্যমে নিন',
+        ctaText: 'ক্রিপ্টো / বাইন্যান্স দিয়ে নিন',
         popular: true,
         isFree: false,
         highlight: true,
-        guarantee: 'তাত্ক্ষণিক ডিসকর্ড অ্যাক্টিভেশন • যেকোনো সময় বাতিলযোগ্য'
+        guarantee: 'তাত্ক্ষণিক বাইন্যান্স ও ওয়েব৩ ডেলিভারি • ০ KYC'
       },
       {
         id: 'pro',
@@ -149,7 +149,7 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
         popular: false,
         isFree: false,
         highlight: false,
-        guarantee: 'বাণিজ্যিক লাইসেন্স • দ্রুত ডিসকর্ড সেটআপ'
+        guarantee: 'বাণিজ্যিক লাইসেন্স • তাত্ক্ষণিক বাইন্যান্স ও ওয়েব৩ অ্যাক্টিভেশন'
       }
     ]
   };
@@ -349,7 +349,9 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
                           id: plan.id,
                           name: plan.name.toUpperCase(),
                           price: plan.rawPrice || plan.price.replace(/[^0-9.]/g, ''),
-                          billing: plan.period
+                          billing: plan.period,
+                          billingCycle: billingCycle,
+                          rawPrice: plan.rawPrice
                         });
                       }
                     }}
