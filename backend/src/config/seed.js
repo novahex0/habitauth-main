@@ -12,8 +12,8 @@ export async function seedDatabase() {
       const owner = db.prepare("SELECT id FROM accounts WHERE role IN ('owner', 'admin') LIMIT 1").get() || db.prepare('SELECT id FROM accounts LIMIT 1').get();
       if (owner) {
         db.prepare(`
-          INSERT INTO applications (id, user_id, app_name, app_secret, public_key, version, status, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT OR REPLACE INTO applications (id, user_id, app_name, app_secret, public_key, version, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
         `).run(
           'EXAMPLEC_a77325d54311',
           owner.id,
@@ -21,7 +21,6 @@ export async function seedDatabase() {
           'sec_25d40b5305284ae4b210744f271aba6604e3c32d923749e2b18264a9b0a5b645',
           'cc49061ce6bd0bfa132ce0c0ba5a32bcb7945163e9f21d6f2d9030fc99a2a40f',
           '1.0',
-          'active',
           now,
           now
         );
