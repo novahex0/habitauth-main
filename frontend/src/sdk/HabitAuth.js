@@ -48,8 +48,11 @@ class HabitAuth {
       const initNonce = this._generateNonce();
       const payload = {
         app_id: this.appId,
+        app_name: this.appName,
         nonce: initNonce,
         client_version: this.version,
+        app_secret: this.appSecret || undefined,
+        public_key: this.publicKey || undefined,
         token: token ? token.trim() : undefined
       };
 
@@ -72,22 +75,33 @@ class HabitAuth {
         return false;
       }
 
+      if (this.publicKey && data.public_key && this.publicKey.trim().toLowerCase() !== data.public_key.trim().toLowerCase()) {
+        this.lastResponse = { success: false, message: 'Public Key does not match! Zero-Trust verification failed.', code: 'PUBKEY_NOT_MATCH' };
+        return false;
+      }
+
       if (data.public_key && !this.publicKey) {
         this.publicKey = data.public_key;
+      }
+
+      if (data.app) {
+        const srvAppName = data.app.name;
+        if (this.appName && srvAppName && this.appName.toLowerCase() !== 'habitapp' && this.appName.toLowerCase() !== srvAppName.toLowerCase()) {
+          this.lastResponse = { success: false, message: `App Name does not match! Client specified '${this.appName}', but registered application name is '${srvAppName}'.`, code: 'APP_NAME_NOT_MATCH' };
+          return false;
+        }
+
+        this.app = {
+          name: srvAppName || this.appName,
+          version: data.app.version || this.version,
+          status: data.app.status || 'active'
+        };
       }
 
       this.sessionNonce = data.session_nonce || initNonce;
       this.isMaintenanceActive = !!data.maintenance;
       this.updateAvailable = !!data.force_update;
       this.downloadUrl = data.download_url || '';
-
-      if (data.app) {
-        this.app = {
-          name: data.app.name || this.appName,
-          version: data.app.version || this.version,
-          status: data.app.status || 'active'
-        };
-      }
 
       this.isInitialized = true;
       return true;
@@ -360,11 +374,11 @@ class HabitAuth {
         const verifyMsg = Buffer.from(`${timestamp}.${rawText}`);
         const isValid = crypto.verify(null, verifyMsg, pubKeyObj, Buffer.from(edSigHex, 'hex'));
         if (!isValid) {
-          throw new Error('[HabitAuth Security Violation] Ed25519 signature mismatch! Proxy tampering detected.');
+          throw new Error('[HabitAuth] Public Key does not match! Zero-Trust signature verification failed.');
         }
         return true;
       } catch (e) {
-        throw new Error('[HabitAuth Security Violation] Ed25519 verification failed: ' + e.message);
+        throw new Error('[HabitAuth] Public Key verification failed: ' + e.message);
       }
     }
 
@@ -372,7 +386,7 @@ class HabitAuth {
     if (this.appSecret && hmacSig && timestamp && crypto) {
       const expected = crypto.createHmac('sha256', this.appSecret).update(`${timestamp}.${rawText}`).digest('hex');
       if (expected.toLowerCase() !== hmacSig.toLowerCase()) {
-        throw new Error('[HabitAuth Security Violation] HMAC signature mismatch! Tampering detected.');
+        throw new Error('[HabitAuth] App Secret does not match! Cryptographic verification failed.');
       }
       return true;
     }

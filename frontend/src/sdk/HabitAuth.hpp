@@ -135,8 +135,15 @@ namespace HabitAuth
                 std::string initNonce = GenerateNonce();
 
                 std::string payload = "{\"app_id\":\"" + Escape(app_id) + "\","
+                                      "\"app_name\":\"" + Escape(app_name) + "\","
                                       "\"nonce\":\"" + initNonce + "\","
                                       "\"client_version\":\"" + Escape(version) + "\"";
+                if (!app_secret.empty()) {
+                    payload += ",\"app_secret\":\"" + Escape(app_secret) + "\"";
+                }
+                if (!public_key.empty()) {
+                    payload += ",\"public_key\":\"" + Escape(public_key) + "\"";
+                }
                 if (!token.empty()) {
                     payload += ",\"token\":\"" + Escape(token) + "\"";
                 }
@@ -174,16 +181,25 @@ namespace HabitAuth
                 if (session_nonce.empty()) session_nonce = initNonce;
 
                 std::string pk = ExtractString(res, "public_key");
+                if (!public_key.empty() && !pk.empty() && public_key != pk) {
+                    last_response = { false, "Public Key does not match! Zero-Trust verification failed.", "PUBKEY_NOT_MATCH", 0, 0 };
+                    return false;
+                }
                 if (public_key.empty() && !pk.empty()) {
                     public_key = pk;
+                }
+
+                std::string srvAppName = ExtractString(res, "name");
+                if (!app_name.empty() && !srvAppName.empty() && app_name != "HabitApp" && app_name != srvAppName) {
+                    last_response = { false, "App Name does not match! Client specified '" + app_name + "', but registered application name is '" + srvAppName + "'.", "APP_NAME_NOT_MATCH", 0, 0 };
+                    return false;
                 }
 
                 is_maintenance = ExtractBool(res, "maintenance");
                 update_available = ExtractBool(res, "force_update");
                 download_url = ExtractString(res, "download_url");
 
-                app.name = ExtractString(res, "name");
-                if (app.name.empty()) app.name = app_name;
+                app.name = srvAppName.empty() ? app_name : srvAppName;
                 app.version = ExtractString(res, "version");
                 if (app.version.empty()) app.version = version;
                 app.status = ExtractString(res, "status");

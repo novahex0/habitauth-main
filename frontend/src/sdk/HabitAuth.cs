@@ -212,8 +212,11 @@ namespace HabitAuth
                 string initNonce = Guid.NewGuid().ToString("N");
                 Dictionary<string, object> payload = new Dictionary<string, object>();
                 payload["app_id"] = AppId;
+                payload["app_name"] = AppName;
                 payload["nonce"] = initNonce;
                 payload["client_version"] = Version;
+                if (!string.IsNullOrEmpty(AppSecret)) payload["app_secret"] = AppSecret;
+                if (!string.IsNullOrEmpty(PublicKey)) payload["public_key"] = PublicKey;
                 if (!string.IsNullOrEmpty(startupToken)) payload["token"] = startupToken;
 
                 string jsonStr = JsonNode.Serialize(payload);
@@ -262,6 +265,11 @@ namespace HabitAuth
 
                 SessionNonce = root.GetString("session_nonce", initNonce);
                 string pk = root.GetString("public_key");
+                if (!string.IsNullOrEmpty(PublicKey) && !string.IsNullOrEmpty(pk) && !string.Equals(PublicKey.Trim(), pk.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    LastResponse = new ResponseData { Success = false, Message = "Public Key does not match! Zero-Trust verification failed.", ErrorCode = "PUBKEY_NOT_MATCH" };
+                    return false;
+                }
                 if (string.IsNullOrEmpty(PublicKey) && !string.IsNullOrEmpty(pk))
                 {
                     PublicKey = pk;
@@ -274,9 +282,15 @@ namespace HabitAuth
                 JsonNode appObj = root.GetObject("app");
                 if (appObj != null)
                 {
+                    string srvAppName = appObj.GetString("name");
+                    if (!string.IsNullOrEmpty(AppName) && !string.IsNullOrEmpty(srvAppName) && !string.Equals(AppName.Trim(), "HabitApp", StringComparison.OrdinalIgnoreCase) && !string.Equals(AppName.Trim(), srvAppName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        LastResponse = new ResponseData { Success = false, Message = "App Name does not match! Client specified '" + AppName + "', but registered application name is '" + srvAppName + "'.", ErrorCode = "APP_NAME_NOT_MATCH" };
+                        return false;
+                    }
                     App = new AppData
                     {
-                        Name = appObj.GetString("name", AppName),
+                        Name = srvAppName,
                         Version = appObj.GetString("version", Version),
                         Status = appObj.GetString("status", "active")
                     };
@@ -610,7 +624,7 @@ namespace HabitAuth
                 bool edValid = Ed25519.Verify(effectivePubKey, tsStr + "." + rawContent, edSig);
                 if (!edValid)
                 {
-                    LastResponse = new ResponseData { Success = false, Message = "Security alert: Ed25519 cryptographic signature mismatch! Proxy tampering detected.", ErrorCode = "ED25519_TAMPER_DETECTED" };
+                    LastResponse = new ResponseData { Success = false, Message = "Public Key does not match! Cryptographic signature verification failed.", ErrorCode = "PUBKEY_NOT_MATCH" };
                     return false;
                 }
             }
@@ -638,7 +652,7 @@ namespace HabitAuth
 
                     if (!FixedTimeEquals(Encoding.UTF8.GetBytes(expectedSig.ToLower()), Encoding.UTF8.GetBytes(serverSig.ToLower())))
                     {
-                        LastResponse = new ResponseData { Success = false, Message = "Security alert: Response HMAC signature mismatch. Proxy tampering detected!", ErrorCode = "TAMPER_DETECTED" };
+                        LastResponse = new ResponseData { Success = false, Message = "App Secret does not match! Cryptographic verification failed.", ErrorCode = "SECRET_NOT_MATCH" };
                         return false;
                     }
                 }

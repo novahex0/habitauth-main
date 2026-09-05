@@ -84,8 +84,11 @@ class HabitAuth:
             init_nonce = self._generate_nonce()
             payload = {
                 "app_id": self.app_id,
+                "app_name": self.app_name,
                 "nonce": init_nonce,
                 "client_version": self.version,
+                "app_secret": self.app_secret if self.app_secret else None,
+                "public_key": self.public_key if self.public_key else None,
                 "token": token.strip() if token else None
             }
 
@@ -111,16 +114,26 @@ class HabitAuth:
                 except Exception:
                     pass
 
-            if res.get("public_key") and not self.public_key:
-                self.public_key = res.get("public_key")
+            srv_pub = res.get("public_key")
+            if self.public_key and srv_pub and self.public_key.strip().lower() != srv_pub.strip().lower():
+                self.last_response = {"success": False, "message": "Public Key does not match! Zero-Trust verification failed.", "code": "PUBKEY_NOT_MATCH"}
+                return False, "Public Key does not match! Zero-Trust verification failed."
+
+            if srv_pub and not self.public_key:
+                self.public_key = srv_pub
+
+            app_obj = res.get("app")
+            if app_obj and isinstance(app_obj, dict):
+                srv_app_name = app_obj.get("name")
+                if self.app_name and srv_app_name and self.app_name.lower() != "habitapp" and self.app_name.lower() != srv_app_name.lower():
+                    self.last_response = {"success": False, "message": f"App Name does not match! Client specified '{self.app_name}', but registered application name is '{srv_app_name}'.", "code": "APP_NAME_NOT_MATCH"}
+                    return False, f"App Name does not match! Client specified '{self.app_name}', but registered application name is '{srv_app_name}'."
+                self.app = app_obj
 
             self.session_nonce = res.get("session_nonce", init_nonce)
             self.is_maintenance_active = bool(res.get("maintenance"))
             self.update_available = bool(res.get("force_update"))
             self.download_url = res.get("download_url", "")
-
-            if res.get("app"):
-                self.app = res.get("app")
 
             self.is_initialized = True
             return True, "Initialized successfully."
@@ -334,14 +347,14 @@ class HabitAuth:
             except ImportError:
                 pass
             except Exception as e:
-                raise PermissionError(f"[HabitAuth Security Alert] Ed25519 signature mismatch! Tampering detected: {e}")
+                raise PermissionError(f"[HabitAuth] Public Key does not match! Zero-Trust signature verification failed: {e}")
 
         # 2. Symmetric HMAC-SHA256 Verification
         if self.app_secret and hmac_sig and ts_str:
             import hmac
             expected = hmac.new(self.app_secret.encode("utf-8"), signed_data, hashlib.sha256).hexdigest()
             if expected.lower() != hmac_sig.lower():
-                raise PermissionError("[HabitAuth Security Alert] HMAC signature mismatch! Tampering detected.")
+                raise PermissionError("[HabitAuth] App Secret does not match! Cryptographic verification failed.")
 
         return True
 

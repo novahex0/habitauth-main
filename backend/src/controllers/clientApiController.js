@@ -122,10 +122,40 @@ export function clientInit(req, res) {
   }
 
   if (!app) {
-    return res.status(404).json({ success: false, message: `Application '${app_id}' not found. Please verify the App ID in your dashboard.` });
+    return res.status(404).json({ success: false, code: 'APP_NOT_FOUND', message: `Application ID / Owner ID '${app_id}' not found! Credentials do not match.` });
   }
 
   const sessionNonce = nonce || uuidv4();
+
+  // Validate App Secret (if supplied by client SDK)
+  const client_secret = req.body.app_secret || req.body.appSecret || req.body.secret;
+  if (client_secret && app.app_secret && client_secret.trim() !== app.app_secret.trim()) {
+    return sendSignedResponse(res, 401, {
+      success: false,
+      code: 'SECRET_NOT_MATCH',
+      message: 'App Secret does not match! Please check your Application Secret in the dashboard.'
+    }, app, sessionNonce);
+  }
+
+  // Validate App Name (if supplied by client SDK and not default placeholder)
+  const client_app_name = req.body.app_name || req.body.appName || req.body.name;
+  if (client_app_name && app.app_name && client_app_name.trim().toLowerCase() !== 'habitapp' && client_app_name.trim().toLowerCase() !== app.app_name.trim().toLowerCase()) {
+    return sendSignedResponse(res, 400, {
+      success: false,
+      code: 'APP_NAME_NOT_MATCH',
+      message: `App Name does not match! Client configured '${client_app_name}', but registered application name is '${app.app_name}'.`
+    }, app, sessionNonce);
+  }
+
+  // Validate Public Key (if supplied by client SDK)
+  const client_pub_key = req.body.public_key || req.body.publicKey;
+  if (client_pub_key && app.public_key && client_pub_key.trim().toLowerCase() !== app.public_key.trim().toLowerCase()) {
+    return sendSignedResponse(res, 400, {
+      success: false,
+      code: 'PUBKEY_NOT_MATCH',
+      message: 'Public Key does not match! Zero-Trust client verification failed.'
+    }, app, sessionNonce);
+  }
 
   // Check Developer Subscription Expiration (Strict Suspension)
   const subCheck = checkDeveloperSubscription(app);
