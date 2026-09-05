@@ -3,13 +3,41 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 
 export async function seedDatabase() {
+  const now = Math.floor(Date.now() / 1000);
+
+  // Always ensure the Example C# application exists so desktop client SDK never returns 404
+  try {
+    const existingApp = db.prepare('SELECT id FROM applications WHERE id = ?').get('EXAMPLEC_a77325d54311');
+    if (!existingApp) {
+      const owner = db.prepare("SELECT id FROM accounts WHERE role IN ('owner', 'admin') LIMIT 1").get() || db.prepare('SELECT id FROM accounts LIMIT 1').get();
+      if (owner) {
+        db.prepare(`
+          INSERT INTO applications (id, user_id, app_name, app_secret, public_key, version, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          'EXAMPLEC_a77325d54311',
+          owner.id,
+          'Example C#',
+          'sec_25d40b5305284ae4b210744f271aba6604e3c32d923749e2b18264a9b0a5b645',
+          'cc49061ce6bd0bfa132ce0c0ba5a32bcb7945163e9f21d6f2d9030fc99a2a40f',
+          '1.0',
+          'active',
+          now,
+          now
+        );
+        console.log('✅ Ensured Example C# application (EXAMPLEC_a77325d54311) is active in database.');
+      }
+    }
+  } catch (e) {
+    console.error('Error ensuring Example C# app:', e.message);
+  }
+
   const existingAccounts = db.prepare('SELECT COUNT(*) as count FROM accounts').get();
   if (existingAccounts.count > 0) {
     return; // Already seeded
   }
 
   console.log('🌱 Seeding initial Habit Auth development data...');
-  const now = Math.floor(Date.now() / 1000);
 
   // 1. Admin / Developer Account
   const adminId = 'usr_' + uuidv4().replace(/-/g, '').slice(0, 16);
