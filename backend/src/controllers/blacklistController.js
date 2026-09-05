@@ -52,8 +52,8 @@ export function getBlacklists(req, res) {
   `;
   const params = [];
 
-  // If not super admin, restrict to user's apps or blacklists created by them
-  if (user.role !== 'admin') {
+  // If not super admin or owner, restrict to user's apps or blacklists created by them
+  if (user.role !== 'admin' && user.role !== 'owner') {
     query += ` AND (b.user_id = ? OR b.app_id IN (SELECT id FROM applications WHERE user_id = ?))`;
     params.push(user.id, user.id);
   }
@@ -139,8 +139,8 @@ export function removeBlacklist(req, res) {
     return res.status(404).json({ success: false, message: 'Blacklist entry not found.' });
   }
 
-  // Permission check: admin or owner
-  if (user.role !== 'admin' && item.user_id !== user.id) {
+  // Permission check: admin or owner or creator or app owner
+  if (user.role !== 'admin' && user.role !== 'owner' && item.user_id !== user.id) {
     const app = item.app_id ? db.prepare('SELECT user_id FROM applications WHERE id = ?').get(item.app_id) : null;
     if (!app || app.user_id !== user.id) {
       return res.status(403).json({ success: false, message: 'You do not have permission to remove this blacklist entry.' });

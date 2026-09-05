@@ -19,15 +19,31 @@ export function authenticateUser(req, res, next) {
   try {
     const decoded = jwt.verify(token, getJwtSecret());
     
-    // Check if session exists and is not revoked
-    const session = db.prepare('SELECT * FROM sessions WHERE token = ? AND is_revoked = 0').get(token);
-    if (!session) {
-      return res.status(401).json({ success: false, message: 'Session expired or revoked.' });
+    // Check if session was explicitly revoked
+    const existingSession = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+    if (existingSession && existingSession.is_revoked) {
+      return res.status(401).json({ success: false, message: 'Session has been revoked.' });
     }
 
-    // Update last_active
     const now = Math.floor(Date.now() / 1000);
-    db.prepare('UPDATE sessions SET last_active = ? WHERE id = ?').run(now, session.id);
+
+    // If session row is missing (e.g. wiped during database cleanup or server reboot), rehydrate it
+    if (!existingSession) {
+      const sessionId = 'ses_' + (decoded.sessionKey ? String(decoded.sessionKey).slice(0, 12) : Math.random().toString(36).substring(2, 12));
+      const userAgent = req.headers['user-agent'] || 'Unknown Browser';
+      const ip = req.ip || req.connection?.remoteAddress || '127.0.0.1';
+      try {
+        db.prepare(`
+          INSERT OR REPLACE INTO sessions (id, user_id, token, ip_address, user_agent, created_at, last_active, is_revoked)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        `).run(sessionId, decoded.userId, token, ip, userAgent, now, now);
+      } catch (e) {
+        // Ignore duplicate insert race condition
+      }
+    } else {
+      // Update last_active
+      db.prepare('UPDATE sessions SET last_active = ? WHERE id = ?').run(now, existingSession.id);
+    }
 
     // Fetch user account & subscription
     const user = db.prepare(`

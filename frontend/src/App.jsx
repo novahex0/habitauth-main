@@ -88,7 +88,7 @@ export default function App() {
               const refreshed = { ...parsed, ...data.user };
               setUser(refreshed);
               localStorage.setItem('habit_user', JSON.stringify(refreshed));
-            } else if (!data.success || data.code === 'ACCOUNT_BANNED' || data.message === 'Session expired or revoked.') {
+            } else if (data.code === 'ACCOUNT_BANNED' || data.message === 'Session has been revoked.' || data.message === 'Session expired or revoked.') {
               localStorage.removeItem('habit_user');
               localStorage.removeItem('habit_token');
               setUser(null);

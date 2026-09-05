@@ -4088,12 +4088,9 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
                   {/* 3.1 Ed25519 Asymmetric Public Key */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <div className="flex-between" style={{ marginBottom: '6px' }}>
-                      <label className="form-label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Shield size={13} color="var(--primary)" /> Ed25519 Public Key
-                      </label>
-                      <span className="badge badge-success" style={{ fontSize: '9.5px', padding: '1px 6px' }}>Zero-Trust Client Key</span>
-                    </div>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Shield size={13} color="var(--primary)" /> Ed25519 Public Key
+                    </label>
                     <div className="flex-align" style={{ gap: '8px' }}>
                       <input 
                         type="text" 

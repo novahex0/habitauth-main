@@ -177,6 +177,21 @@ export function clientInit(req, res) {
         message: 'Startup token is bound to a revoked license key.'
       }, app, sessionNonce);
     }
+  // Application Version Check & Update Enforcement
+  const clientVersionRaw = client_version ? String(client_version).trim() : '';
+  const appVersionRaw = (app.latest_version || app.version || '').trim();
+  const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
+  const appVersionClean = appVersionRaw.replace(/^v/i, '');
+
+  if (appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
+    recordAuditLog(null, app.id, 'CLIENT_VERSION_MISMATCH', `Client version mismatch: running v${clientVersionRaw} while app requires v${appVersionRaw}`, extractClientIp(req));
+    return sendSignedResponse(res, 426, {
+      success: false,
+      code: 'UPDATE_REQUIRED',
+      message: `A mandatory update is required! You are running version ${clientVersionRaw || '1.0.0'}, but the current version is ${appVersionRaw}. Please update your client to continue.`,
+      latest_version: appVersionRaw,
+      download_url: app.update_download_url || ''
+    }, app, sessionNonce);
   }
 
   return sendSignedResponse(res, 200, {
@@ -259,18 +274,20 @@ export async function clientLogin(req, res) {
     }, app, nonce);
   }
 
-  // 2. Check Force Auto-Update
-  const clientVersion = req.body.client_version || req.body.version;
-  if (app.force_update_enabled && app.latest_version) {
-    if (!clientVersion || clientVersion.trim() !== app.latest_version.trim()) {
-      return sendSignedResponse(res, 426, {
-        success: false,
-        code: 'UPDATE_REQUIRED',
-        message: `A mandatory update (v${app.latest_version}) is required to run this software.`,
-        latest_version: app.latest_version,
-        download_url: app.update_download_url || ''
-      }, app, nonce);
-    }
+  // 2. Check Version Match & Force Auto-Update
+  const clientVersionRaw = (req.body.client_version || req.body.version || '').trim();
+  const appVersionRaw = (app.latest_version || app.version || '').trim();
+  const clientVersionClean = clientVersionRaw.replace(/^v/i, '');
+  const appVersionClean = appVersionRaw.replace(/^v/i, '');
+
+  if (appVersionClean && clientVersionClean && clientVersionClean !== appVersionClean) {
+    return sendSignedResponse(res, 426, {
+      success: false,
+      code: 'UPDATE_REQUIRED',
+      message: `A mandatory update (v${appVersionRaw}) is required to log in. You are currently running v${clientVersionRaw || '1.0.0'}.`,
+      latest_version: appVersionRaw,
+      download_url: app.update_download_url || ''
+    }, app, nonce);
   }
 
   // 3. Check Anti-Patch File Integrity Hash (MD5 / SHA-256)

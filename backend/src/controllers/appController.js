@@ -176,7 +176,12 @@ export function updateApplication(req, res) {
   const { app_name, version, status } = req.body;
   const userId = req.user.id;
 
-  const app = db.prepare('SELECT * FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
+  let app;
+  if (req.user.role === 'admin' || req.user.role === 'owner') {
+    app = db.prepare('SELECT * FROM applications WHERE id = ?').get(appId);
+  } else {
+    app = db.prepare('SELECT * FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
+  }
   if (!app) {
     return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
   }
@@ -186,8 +191,10 @@ export function updateApplication(req, res) {
   const updatedVersion = version ? version.trim() : app.version;
   const updatedStatus = status || app.status;
 
-  db.prepare('UPDATE applications SET app_name = ?, version = ?, status = ?, updated_at = ? WHERE id = ?')
-    .run(updatedName, updatedVersion, updatedStatus, now, appId);
+  db.prepare('UPDATE applications SET app_name = ?, version = ?, latest_version = ?, status = ?, updated_at = ? WHERE id = ?')
+    .run(updatedName, updatedVersion, updatedVersion, updatedStatus, now, appId);
+
+  recordAuditLog(userId, appId, 'APPLICATION_UPDATED', `Application '${updatedName}' version updated to ${updatedVersion}`, req.ip);
 
   res.json({ success: true, message: 'Application updated successfully.' });
 }

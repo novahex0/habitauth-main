@@ -65,15 +65,16 @@ namespace HabitAuth
             string version = "1.0",
             string tokenPath = "",
             string publicKey = "",
-            string baseUrl = "http://localhost:5000/api/v1")
+            string baseUrl = "https://habitauth.onrender.com/api/v1",
+            string appId = "")
         {
             AppName = name ?? "HabitApp";
-            AppId = ownerid ?? "";
+            AppId = !string.IsNullOrEmpty(appId) ? appId : (ownerid ?? "");
             AppSecret = secret ?? "";
             PublicKey = publicKey ?? "";
             Version = version ?? "1.0";
             TokenPath = tokenPath ?? "";
-            BaseUrl = (baseUrl ?? "http://localhost:5000/api/v1").TrimEnd('/');
+            BaseUrl = (baseUrl ?? "https://habitauth.onrender.com/api/v1").TrimEnd('/');
 
             User = new UserData();
             App = new AppData { Name = AppName, Version = Version, Status = "active" };
@@ -713,8 +714,9 @@ namespace HabitAuth
             string version = "1.0",
             string tokenPath = "",
             string publicKey = "",
-            string baseUrl = "http://localhost:5000/api/v1")
-            : base(name, ownerid, secret, version, tokenPath, publicKey, baseUrl)
+            string baseUrl = "https://habitauth.onrender.com/api/v1",
+            string appId = "")
+            : base(name, ownerid, secret, version, tokenPath, publicKey, baseUrl, appId)
         {
         }
     }
