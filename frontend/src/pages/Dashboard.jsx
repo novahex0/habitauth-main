@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Book, LayoutDashboard, Smartphone, Key, Users, Bell, Code, Shield, ShieldAlert, MessageSquare, LifeBuoy, FileText,
+  Book, LayoutDashboard, CreditCard, Smartphone, Key, Users, Bell, Code, Shield, ShieldAlert, MessageSquare, LifeBuoy, FileText,
   Plus, Copy, Check, Eye, EyeOff, RefreshCw, Trash2, Ban, ExternalLink, ArrowLeft,
   CheckCircle2, AlertTriangle, Search, Filter, Lock, Unlock, KeyRound, Sparkles,
   Calendar, UserPlus, LogOut, Globe, Terminal, Activity, X, Sliders, Edit2, Menu,
@@ -100,6 +100,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
         if (seg0 === 'tickets' || seg0 === 'ticket') return 'tickets';
         if (seg0 === 'audit') return 'audit';
         if (seg0 === 'admin') return 'admin';
+        if (seg0 === 'orders' || seg0 === 'order') return 'orders';
         if (seg0 === 'overview') return 'overview';
       }
     } catch (e) {}
@@ -155,6 +156,8 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
           setActiveNav('audit');
         } else if (seg0 === 'admin') {
           setActiveNav('admin');
+        } else if (seg0 === 'orders' || seg0 === 'order') {
+          setActiveNav('orders');
         } else if (seg0 === 'overview') {
           setActiveNav('overview');
         }
@@ -176,6 +179,113 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  
+  // ── PAYMENT ORDERS SYSTEM STATE & ACTIONS ──
+  const [userOrders, setUserOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [adminOrders, setAdminOrders] = useState([]);
+  const [loadingAdminOrders, setLoadingAdminOrders] = useState(false);
+  const [adminOrderFilter, setAdminOrderFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+  const [adminOrderSearch, setAdminOrderSearch] = useState('');
+  const [reviewingOrderId, setReviewingOrderId] = useState(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectingOrderId, setRejectingOrderId] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const fetchUserOrders = async () => {
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    setLoadingOrders(true);
+    try {
+      const res = await fetch('/api/v1/payment/my-orders', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserOrders(data.orders || []);
+      }
+    } catch (e) {
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const fetchAdminOrders = async () => {
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    setLoadingAdminOrders(true);
+    try {
+      const res = await fetch('/api/v1/admin/payment-orders', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminOrders(data.orders || []);
+      }
+    } catch (e) {
+    } finally {
+      setLoadingAdminOrders(false);
+    }
+  };
+
+  const handleReviewOrder = async (orderId, action, adminNotes = '') => {
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    setReviewingOrderId(orderId);
+    try {
+      const res = await fetch(`/api/v1/admin/payment-orders/${orderId}/review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ action, admin_notes: adminNotes })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'Order reviewed successfully!', 'success');
+        fetchAdminOrders();
+        fetchUserOrders();
+        // Refresh profile if self
+        fetch('/api/v1/auth/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+          .then(r => r.json())
+          .then(d => {
+            if (d.success && d.user) {
+              setCurrentUser(prev => ({ ...prev, ...d.user }));
+              localStorage.setItem('habit_user', JSON.stringify(d.user));
+            }
+          }).catch(() => {});
+      } else {
+        showToast(data.message || 'Failed to review order', 'error');
+      }
+    } catch (err) {
+      showToast('Error reviewing order: ' + err.message, 'error');
+    } finally {
+      setReviewingOrderId(null);
+      setRejectModalOpen(false);
+      setRejectingOrderId(null);
+      setRejectionReason('');
+    }
+  };
+
+  useEffect(() => {
+    fetchUserOrders();
+    if (user?.role === 'admin' || user?.role === 'owner') {
+      fetchAdminOrders();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeNav === 'orders') {
+      fetchUserOrders();
+    }
+    if (activeNav === 'admin') {
+      fetchAdminOrders();
+    }
+  }, [activeNav]);
 
   const [apps, setApps] = useState([]);
   const [selectedAppId, setSelectedAppId] = useState('');
@@ -9799,6 +9909,238 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
             )}
 
             {/* 7. DATABASE MANAGEMENT & HEALTH HUB SUB-TAB */}
+            
+            {/* ── 8. ADMIN PAYMENT ORDERS REVIEW & RELEASE SUB-TAB ── */}
+            {adminSubTab === 'orders' && (
+              <div className="animate-slide-up">
+                {/* Search & Filter Bar */}
+                <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '20px' }}>
+                  <div className="flex-between" style={{ flexWrap: 'wrap', gap: '14px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {['all', 'pending', 'approved', 'rejected'].map(f => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setAdminOrderFilter(f)}
+                          className={`btn ${adminOrderFilter === f ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700, textTransform: 'capitalize' }}
+                        >
+                          {f === 'pending' ? `⏳ Pending (${adminOrders.filter(o => o.status === 'pending').length})` :
+                           f === 'approved' ? `✓ Approved (${adminOrders.filter(o => o.status === 'approved' || o.status === 'completed').length})` :
+                           f === 'rejected' ? `✗ Rejected (${adminOrders.filter(o => o.status === 'rejected').length})` :
+                           `All (${adminOrders.length})`}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <div style={{ position: 'relative' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input
+                          type="text"
+                          value={adminOrderSearch}
+                          onChange={(e) => setAdminOrderSearch(e.target.value)}
+                          placeholder="Search TrxID, User, Phone..."
+                          className="form-input"
+                          style={{ paddingLeft: '32px', height: '36px', fontSize: '12px', width: '220px' }}
+                        />
+                      </div>
+
+                      <button
+                        onClick={fetchAdminOrders}
+                        className="btn btn-secondary"
+                        disabled={loadingAdminOrders}
+                        style={{ height: '36px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+                      >
+                        <RefreshCw size={13} className={loadingAdminOrders ? 'spinner-loader' : ''} />
+                        <span>Refresh</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Orders Table */}
+                <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
+                  <div className="table-responsive">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>User / Email</th>
+                          <th>Plan & Billing</th>
+                          <th>Gateway</th>
+                          <th>Amount</th>
+                          <th>Sender Phone / ID</th>
+                          <th>Transaction ID (TrxID)</th>
+                          <th>Submitted</th>
+                          <th>Status</th>
+                          <th style={{ textAlign: 'right' }}>Admin Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminOrders
+                          .filter(ord => {
+                            if (adminOrderFilter === 'pending') return ord.status === 'pending';
+                            if (adminOrderFilter === 'approved') return ord.status === 'approved' || ord.status === 'completed';
+                            if (adminOrderFilter === 'rejected') return ord.status === 'rejected';
+                            return true;
+                          })
+                          .filter(ord => {
+                            if (!adminOrderSearch) return true;
+                            const s = adminOrderSearch.toLowerCase();
+                            return (ord.username && ord.username.toLowerCase().includes(s)) ||
+                                   (ord.email && ord.email.toLowerCase().includes(s)) ||
+                                   (ord.txid && ord.txid.toLowerCase().includes(s)) ||
+                                   (ord.sender_number && ord.sender_number.toLowerCase().includes(s)) ||
+                                   (ord.payment_method && ord.payment_method.toLowerCase().includes(s));
+                          })
+                          .map((ord) => {
+                            const isPending = ord.status === 'pending';
+                            const isApproved = ord.status === 'approved' || ord.status === 'completed';
+                            const isRejected = ord.status === 'rejected';
+
+                            return (
+                              <tr key={ord.id} style={{ background: isPending ? 'rgba(245, 158, 11, 0.04)' : 'transparent' }}>
+                                <td>
+                                  <div style={{ fontWeight: 800, color: '#fff', fontSize: '13px' }}>
+                                    {ord.username || 'Anonymous'}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    {ord.email || 'No email'}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div style={{ fontWeight: 700, color: ord.plan === 'pro' ? '#f59e0b' : '#38bdf8' }}>
+                                    {(ord.plan || 'DEVELOPER').toUpperCase()}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    {ord.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'}
+                                  </div>
+                                </td>
+                                <td>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '3px 8px',
+                                    borderRadius: '6px',
+                                    background: ord.payment_method === 'bkash' ? 'rgba(226, 19, 110, 0.15)' :
+                                                ord.payment_method === 'rocket' ? 'rgba(140, 52, 148, 0.15)' :
+                                                ord.payment_method === 'nagad' ? 'rgba(247, 148, 29, 0.15)' :
+                                                ord.payment_method === 'binance_pay' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(6, 182, 212, 0.15)',
+                                    color: ord.payment_method === 'bkash' ? '#e2136e' :
+                                           ord.payment_method === 'rocket' ? '#c084fc' :
+                                           ord.payment_method === 'nagad' ? '#f97316' :
+                                           ord.payment_method === 'binance_pay' ? '#f59e0b' : '#38bdf8',
+                                    fontWeight: 800,
+                                    fontSize: '11px',
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {ord.payment_method}
+                                  </span>
+                                </td>
+                                <td style={{ fontWeight: 800, color: '#10b981' }}>
+                                  {ord.currency === 'BDT' ? `৳${ord.amount}` : `${ord.amount}`}
+                                </td>
+                                <td>
+                                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: '#e2e8f0', fontWeight: 600 }}>
+                                    {ord.sender_number || ord.from_address || 'N/A'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: '#38bdf8', fontWeight: 700 }}>
+                                      {ord.txid}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(ord.txid, ord.id)}
+                                      style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}
+                                      title="Copy TrxID"
+                                    >
+                                      {copiedKey === ord.id ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                                    </button>
+                                  </div>
+                                </td>
+                                <td style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                  {new Date(ord.created_at * 1000).toLocaleString()}
+                                </td>
+                                <td>
+                                  {isPending && (
+                                    <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10.5px' }}>
+                                      <Clock size={10} /> PENDING
+                                    </span>
+                                  )}
+                                  {isApproved && (
+                                    <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10.5px' }}>
+                                      <CheckCircle2 size={10} /> APPROVED
+                                    </span>
+                                  )}
+                                  {isRejected && (
+                                    <span className="badge badge-danger" title={ord.admin_notes || 'Rejected'} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10.5px' }}>
+                                      <AlertCircle size={10} /> REJECTED
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  {isPending ? (
+                                    <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                      <button
+                                        type="button"
+                                        disabled={reviewingOrderId === ord.id}
+                                        onClick={() => {
+                                          promptConfirm({
+                                            title: 'Approve Payment & Activate Plan',
+                                            message: `Are you sure you want to approve order ${ord.id} for user "${ord.username}"? This will immediately upgrade their account to ${ord.plan.toUpperCase()} plan.`,
+                                            confirmText: 'Approve & Activate',
+                                            isDanger: false,
+                                            onConfirm: () => handleReviewOrder(ord.id, 'approve', 'Approved by Admin')
+                                          });
+                                        }}
+                                        className="btn btn-success"
+                                        style={{ padding: '5px 10px', fontSize: '11.5px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Check size={12} /> Approve
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={reviewingOrderId === ord.id}
+                                        onClick={() => {
+                                          setRejectingOrderId(ord.id);
+                                          setRejectionReason('');
+                                          setRejectModalOpen(true);
+                                        }}
+                                        className="btn btn-danger"
+                                        style={{ padding: '5px 10px', fontSize: '11.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <X size={12} /> Reject
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                      Reviewed by {ord.reviewed_by || 'admin'}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                        {adminOrders.length === 0 && (
+                          <tr>
+                            <td colSpan="9" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                              No payment orders submitted yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
             {adminSubTab === 'database' && (
               <div className="animate-slide-up tab-animated-content">
                 {/* Header bar */}

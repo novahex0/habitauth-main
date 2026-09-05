@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Pricing from './components/Pricing';
-import CryptoCheckoutModal from './components/CryptoCheckoutModal';
+import PaymentCheckoutModal from './components/PaymentCheckoutModal';
 import LoginModal from './components/LoginModal';
 import PasswordResetModal from './components/PasswordResetModal';
 import Dashboard from './pages/Dashboard';
@@ -179,6 +179,18 @@ export default function App() {
     setUser(userData);
     setCurrentView('dashboard');
     localStorage.setItem('habit_current_view', 'dashboard');
+
+    try {
+      const pending = sessionStorage.getItem('habit_pending_plan');
+      if (pending) {
+        sessionStorage.removeItem('habit_pending_plan');
+        const plan = JSON.parse(pending);
+        setTimeout(() => {
+          setSelectedPlanForPurchase(plan);
+          setPurchaseModalOpen(true);
+        }, 350);
+      }
+    } catch (e) {}
   };
 
   const handleLogout = () => {
@@ -279,13 +291,13 @@ export default function App() {
           }}
         />
 
-        <CryptoCheckoutModal
+        <PaymentCheckoutModal
           isOpen={purchaseModalOpen}
           onClose={() => setPurchaseModalOpen(false)}
           selectedPlan={selectedPlanForPurchase}
           user={user}
-          onUpgradeSuccess={handleUpgradeSuccess}
           onOpenLogin={handleOpenLogin}
+          onNavigateToOrders={() => handleNavigate('dashboard', null, 'orders')}
         />
       </div>
     );
@@ -327,13 +339,13 @@ export default function App() {
           }}
         />
 
-        <CryptoCheckoutModal
+        <PaymentCheckoutModal
           isOpen={purchaseModalOpen}
           onClose={() => setPurchaseModalOpen(false)}
           selectedPlan={selectedPlanForPurchase}
           user={user}
-          onUpgradeSuccess={handleUpgradeSuccess}
           onOpenLogin={handleOpenLogin}
+          onNavigateToOrders={() => handleNavigate('dashboard', null, 'orders')}
         />
       </div>
     );
@@ -402,13 +414,13 @@ export default function App() {
         }}
       />
 
-      <CryptoCheckoutModal
+      <PaymentCheckoutModal
         isOpen={purchaseModalOpen}
         onClose={() => setPurchaseModalOpen(false)}
         selectedPlan={selectedPlanForPurchase}
         user={user}
-        onUpgradeSuccess={handleUpgradeSuccess}
         onOpenLogin={handleOpenLogin}
+        onNavigateToOrders={() => handleNavigate('dashboard', null, 'orders')}
       />
     </div>
   );

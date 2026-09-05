@@ -50,7 +50,8 @@ import {
   getBlacklists, addBlacklist, removeBlacklist 
 } from '../controllers/blacklistController.js';
 import { 
-  getCryptoConfig, verifyCryptoPayment 
+  getPaymentConfig, submitPaymentOrder, getUserOrders, getAdminOrders, reviewOrder,
+  getPaymentConfig as getCryptoConfig, submitPaymentOrder as verifyCryptoPayment
 } from '../controllers/paymentController.js';
 
 import { authenticateUser, requireAdmin, checkMaintenanceMode } from '../middleware/authMiddleware.js';
@@ -246,8 +247,12 @@ router.post('/audit-logs/purge', authenticateUser, purgeAuditLogs);
 router.post('/audit-logs/retention/simulate', authenticateUser, simulateRetentionDay);
 router.get('/audit-logs/export', authenticateUser, exportAuditLogsBackup);
 
-// ── 11. WEB3 & BINANCE CRYPTO CHECKOUT ───────────────────────
-router.get('/payment/config', getCryptoConfig);
-router.post('/payment/verify-crypto', authenticateUser, verifyCryptoPayment);
+// ── 11. MULTI-GATEWAY PAYMENTS & ORDERS (BKASH, ROCKET, NAGAD, BINANCE, TRC20) ──
+router.get('/payment/config', getPaymentConfig);
+router.post('/payment/submit-order', authenticateUser, submitPaymentOrder);
+router.post('/payment/verify-crypto', authenticateUser, submitPaymentOrder);
+router.get('/payment/my-orders', authenticateUser, getUserOrders);
+router.get('/admin/payment-orders', authenticateUser, requireAdmin, getAdminOrders);
+router.post('/admin/payment-orders/:id/review', authenticateUser, requireAdmin, reviewOrder);
 
 export default router;

@@ -345,6 +345,20 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
                           onOpenLogin();
                         }
                       } else {
+                        if (!user) {
+                          try {
+                            sessionStorage.setItem('habit_pending_plan', JSON.stringify({
+                              id: plan.id,
+                              name: plan.name.toUpperCase(),
+                              price: plan.rawPrice || plan.price.replace(/[^0-9.]/g, ''),
+                              billing: plan.period,
+                              billingCycle: billingCycle,
+                              rawPrice: plan.rawPrice
+                            }));
+                          } catch (e) {}
+                          onOpenLogin('signin');
+                          return;
+                        }
                         onSelectPlan({
                           id: plan.id,
                           name: plan.name.toUpperCase(),

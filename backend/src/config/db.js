@@ -276,7 +276,12 @@ export function initDatabase() {
       txid TEXT UNIQUE NOT NULL,
       from_address TEXT,
       to_address TEXT NOT NULL,
-      status TEXT DEFAULT 'completed',
+      payment_method TEXT DEFAULT 'trc20', -- 'bkash' | 'rocket' | 'nagad' | 'binance_pay' | 'trc20'
+      sender_number TEXT DEFAULT '',
+      admin_notes TEXT DEFAULT '',
+      reviewed_at INTEGER DEFAULT 0,
+      reviewed_by TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending', -- 'pending' | 'approved' | 'rejected'
       created_at INTEGER NOT NULL,
       FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
     );
@@ -326,6 +331,14 @@ export function initDatabase() {
   try { db.exec("ALTER TABLE applications ADD COLUMN frozen_at INTEGER DEFAULT 0;"); } catch (e) {}
 
   try { db.exec("ALTER TABLE application_users ADD COLUMN is_online INTEGER DEFAULT 0;"); } catch (e) {}
+
+  // Payment Orders Auto-Migrations
+  try { db.exec("ALTER TABLE crypto_payments ADD COLUMN payment_method TEXT DEFAULT 'trc20';"); } catch (e) {}
+  try { db.exec("ALTER TABLE crypto_payments ADD COLUMN sender_number TEXT DEFAULT '';"); } catch (e) {}
+  try { db.exec("ALTER TABLE crypto_payments ADD COLUMN admin_notes TEXT DEFAULT '';"); } catch (e) {}
+  try { db.exec("ALTER TABLE crypto_payments ADD COLUMN reviewed_at INTEGER DEFAULT 0;"); } catch (e) {}
+  try { db.exec("ALTER TABLE crypto_payments ADD COLUMN reviewed_by TEXT DEFAULT '';"); } catch (e) {}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_crypto_payments_status ON crypto_payments(status);"); } catch (e) {}
 
   // Auto-sync team capacity to 500 for Pro and Admin accounts
   try {
