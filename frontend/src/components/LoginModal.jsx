@@ -9,6 +9,7 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
   const [error, setError] = useState('');
   const [showForgotNotice, setShowForgotNotice] = useState(false);
   const [bannedInfo, setBannedInfo] = useState(initialBannedInfo || { isBanned: false, reason: '' });
+  const [pendingPlan, setPendingPlan] = useState(null);
 
   useEffect(() => {
     setActiveTab(initialTab || initialMode || 'signin');
@@ -19,6 +20,21 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
       setBannedInfo(initialBannedInfo);
     }
   }, [initialBannedInfo]);
+
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const stored = localStorage.getItem('habit_pending_plan') || sessionStorage.getItem('habit_pending_plan');
+        if (stored) {
+          setPendingPlan(JSON.parse(stored));
+        } else {
+          setPendingPlan(null);
+        }
+      } catch (e) {
+        setPendingPlan(null);
+      }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -31,6 +47,7 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
     setError('');
     setShowForgotNotice(false);
     setBannedInfo({ isBanned: false, reason: '' });
+    setPendingPlan(null);
     onClose();
   };
 
@@ -344,6 +361,27 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
                 ? 'Access your software dashboard and cryptographic license control center.' 
                 : 'Join thousands of developers protecting and monetizing their applications.'}
             </p>
+
+            {pendingPlan && (
+              <div style={{
+                background: 'rgba(37, 99, 235, 0.14)',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                marginBottom: '18px',
+                fontSize: '13px',
+                color: '#93c5fd',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '9px',
+                textAlign: 'left'
+              }}>
+                <Lock size={15} style={{ color: '#60a5fa', flexShrink: 0 }} />
+                <span>
+                  Please sign in or create an account to proceed with your <strong>{pendingPlan.name || 'subscription'}</strong> order.
+                </span>
+              </div>
+            )}
 
             {/* Tab Switcher */}
             <div style={{

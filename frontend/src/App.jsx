@@ -74,6 +74,45 @@ export default function App() {
     setLoginModalOpen(true);
   };
 
+  const proceedToCheckout = async (plan, authToken) => {
+    const token = authToken || localStorage.getItem('habit_token');
+    if (!token || !plan) return;
+
+    try {
+      const res = await fetch('/api/v1/payment/create-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          plan: plan.id,
+          billing_cycle: plan.billingCycle || 'monthly'
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.checkout_url) {
+        window.location.href = data.checkout_url;
+        return;
+      }
+    } catch (err) {
+      console.error('[Checkout Redirect Error]:', err);
+    }
+
+    // Fallback if session endpoint fails
+    const fallbackId = 'pay_' + Math.random().toString(36).substring(2, 12);
+    try {
+      localStorage.setItem('habit_payment_session_' + fallbackId, JSON.stringify({
+        id: fallbackId,
+        plan: plan.id,
+        billing_cycle: plan.billingCycle || 'monthly',
+        amount_bdt: plan.billingCycle === 'yearly' ? 1500 : 150,
+        amount_usd: plan.billingCycle === 'yearly' ? 12 : 1.2
+      }));
+    } catch (e) {}
+    window.location.href = `/payment/${fallbackId}?method=mobile_banking`;
+  };
+
   // Ensure permanent dark obsidian theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -142,12 +181,25 @@ export default function App() {
         headers: { Authorization: `Bearer ${tokenParam}` }
       })
         .then(r => r.json())
-        .then(data => {
+        .then(async (data) => {
           if (data.success && data.user) {
             setUser(data.user);
             localStorage.setItem('habit_user', JSON.stringify(data.user));
             setCurrentView('dashboard');
             localStorage.setItem('habit_current_view', 'dashboard');
+
+            try {
+              const pending = localStorage.getItem('habit_pending_plan') || sessionStorage.getItem('habit_pending_plan');
+              if (pending) {
+                localStorage.removeItem('habit_pending_plan');
+                sessionStorage.removeItem('habit_pending_plan');
+                const plan = JSON.parse(pending);
+                await proceedToCheckout(plan, tokenParam);
+                return;
+              }
+            } catch (e) {
+              console.error('Pending plan redirect error:', e);
+            }
           } else {
             console.error('Failed to authenticate with token:', data);
             alert(`Authentication failed: ${data.message || 'Could not load profile.'}`);
@@ -177,22 +229,24 @@ export default function App() {
     }
   }, [currentView, user]);
 
-  const handleLoginSuccess = (userData) => {
+  const handleLoginSuccess = async (userData) => {
     setUser(userData);
     setCurrentView('dashboard');
     localStorage.setItem('habit_current_view', 'dashboard');
 
     try {
-      const pending = sessionStorage.getItem('habit_pending_plan');
+      const pending = localStorage.getItem('habit_pending_plan') || sessionStorage.getItem('habit_pending_plan');
       if (pending) {
+        localStorage.removeItem('habit_pending_plan');
         sessionStorage.removeItem('habit_pending_plan');
         const plan = JSON.parse(pending);
-        setTimeout(() => {
-          setSelectedPlanForPurchase(plan);
-          setPurchaseModalOpen(true);
-        }, 350);
+        const token = localStorage.getItem('habit_token');
+        await proceedToCheckout(plan, token);
+        return;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Post-login checkout error:', e);
+    }
   };
 
   const handleLogout = () => {
@@ -210,47 +264,19 @@ export default function App() {
     window.history.pushState({}, '', '/');
   };
 
-    const handleSelectPlan = async (plan) => {
+  const handleSelectPlan = async (plan) => {
     const token = localStorage.getItem('habit_token');
     if (!token || !user) {
       try {
-        sessionStorage.setItem('habit_pending_plan', JSON.stringify(plan));
+        const planData = JSON.stringify(plan);
+        sessionStorage.setItem('habit_pending_plan', planData);
+        localStorage.setItem('habit_pending_plan', planData);
       } catch (e) {}
       handleOpenLogin('signin');
       return;
     }
 
-    try {
-      const res = await fetch('/api/v1/payment/create-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          plan: plan.id,
-          billing_cycle: plan.billingCycle || 'monthly'
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.checkout_url) {
-        window.open(data.checkout_url, '_blank');
-        return;
-      }
-    } catch (err) {}
-
-    // Fallback: open in new tab with generated UUID if network glitch
-    const fallbackId = 'pay_' + Math.random().toString(36).substring(2, 12);
-    try {
-      localStorage.setItem('habit_payment_session_' + fallbackId, JSON.stringify({
-        id: fallbackId,
-        plan: plan.id,
-        billing_cycle: plan.billingCycle || 'monthly',
-        amount_bdt: plan.billingCycle === 'yearly' ? 1500 : 150,
-        amount_usd: plan.billingCycle === 'yearly' ? 12 : 1.2
-      }));
-    } catch (e) {}
-    window.open(`/payment/${fallbackId}?method=mobile_banking`, '_blank');
+    await proceedToCheckout(plan, token);
   };
 
   const handleUpgradeSuccess = (paymentResult) => {

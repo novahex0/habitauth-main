@@ -375,14 +375,16 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
                       } else {
                         if (!user) {
                           try {
-                            sessionStorage.setItem('habit_pending_plan', JSON.stringify({
+                            const pendingData = JSON.stringify({
                               id: plan.id,
                               name: plan.name.toUpperCase(),
                               price: plan.rawPrice || plan.price.replace(/[^0-9.]/g, ''),
                               billing: plan.period,
                               billingCycle: billingCycle,
                               rawPrice: plan.rawPrice
-                            }));
+                            });
+                            sessionStorage.setItem('habit_pending_plan', pendingData);
+                            localStorage.setItem('habit_pending_plan', pendingData);
                           } catch (e) {}
                           onOpenLogin('signin');
                           return;
