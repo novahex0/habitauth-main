@@ -479,6 +479,18 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
       if (adminSubTab === 'coupons') fetchAdminCoupons();
       if (adminSubTab === 'billing') fetchPaymentSettings();
     }
+    if (activeNav === 'admin-orders') {
+      fetchAdminOrders();
+    }
+    if (activeNav === 'admin-coupons') {
+      fetchAdminCoupons();
+    }
+    if (activeNav === 'admin-billing') {
+      fetchPaymentSettings();
+    }
+    if (activeNav === 'admin-database') {
+      fetchDatabaseStats();
+    }
   }, [activeNav]);
 
   const [apps, setApps] = useState([]);
@@ -3738,8 +3750,8 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
               {/* 2. Payment Orders */}
               <li 
-                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'orders' ? 'active' : ''}`} 
-                onClick={() => { setActiveNav('admin'); setAdminSubTab('orders'); fetchAdminOrders(); }} 
+                className={`nav-item ${activeNav === 'admin-orders' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin-orders'); fetchAdminOrders(); }} 
                 style={{ color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -3761,8 +3773,8 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
               {/* 3. Coupons */}
               <li 
-                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'coupons' ? 'active' : ''}`} 
-                onClick={() => { setActiveNav('admin'); setAdminSubTab('coupons'); fetchAdminCoupons(); }} 
+                className={`nav-item ${activeNav === 'admin-coupons' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin-coupons'); fetchAdminCoupons(); }} 
                 style={{ color: '#f59e0b' }}
               >
                 <Zap size={17} /> <span>Coupons</span>
@@ -3770,8 +3782,8 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
               {/* 4. Billing & Settings */}
               <li 
-                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'billing' ? 'active' : ''}`} 
-                onClick={() => { setActiveNav('admin'); setAdminSubTab('billing'); fetchPaymentSettings(); }} 
+                className={`nav-item ${activeNav === 'admin-billing' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin-billing'); fetchPaymentSettings(); }} 
                 style={{ color: '#a855f7' }}
               >
                 <Sliders size={17} /> <span>Billing & Settings</span>
@@ -3779,8 +3791,8 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
               {/* 5. Database Hub */}
               <li 
-                className={`nav-item ${activeNav === 'admin' && adminSubTab === 'database' ? 'active' : ''}`} 
-                onClick={() => { setActiveNav('admin'); setAdminSubTab('database'); fetchDatabaseStats(); }} 
+                className={`nav-item ${activeNav === 'admin-database' ? 'active' : ''}`} 
+                onClick={() => { setActiveNav('admin-database'); fetchDatabaseStats(); }} 
                 style={{ color: '#10b981' }}
               >
                 <Database size={17} /> <span>Database Hub</span>
@@ -8893,46 +8905,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               >
                 <Code size={13} /> Settings → SDK
               </button>
-              <button 
-                onClick={() => { setAdminSubTab('orders'); fetchAdminOrders(); }} 
-                className={`btn ${adminSubTab === 'orders' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <CreditCard size={13} /> Payment Orders ({adminOrders.length})
-                {adminOrders.filter(o => o.status === 'pending').length > 0 && (
-                  <span style={{
-                    background: '#ef4444',
-                    color: '#fff',
-                    borderRadius: '10px',
-                    fontSize: '10px',
-                    padding: '1px 6px',
-                    fontWeight: 900
-                  }}>
-                    {adminOrders.filter(o => o.status === 'pending').length}
-                  </span>
-                )}
-              </button>
-              <button 
-                onClick={() => { setAdminSubTab('coupons'); fetchAdminCoupons(); }} 
-                className={`btn ${adminSubTab === 'coupons' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Zap size={13} color="#f59e0b" /> Coupons ({adminCoupons.length})
-              </button>
-              <button 
-                onClick={() => { setAdminSubTab('billing'); fetchPaymentSettings(); }} 
-                className={`btn ${adminSubTab === 'billing' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Sliders size={13} color="#38bdf8" /> Billing & Settings
-              </button>
-              <button 
-                onClick={() => { setAdminSubTab('database'); fetchDatabaseStats(); }} 
-                className={`btn ${adminSubTab === 'database' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Database size={13} /> Database Hub
-              </button>
+              
             </div>
 
             {/* 1. SYSTEM SETTINGS & NOTICES SUB-TAB */}
@@ -10374,11 +10347,58 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               </div>
             )}
 
-            {/* 7. DATABASE MANAGEMENT & HEALTH HUB SUB-TAB */}
-            
-            {/* ── 8. ADMIN PAYMENT ORDERS REVIEW & RELEASE SUB-TAB ── */}
-            {adminSubTab === 'orders' && (
-              <div className="animate-slide-up">
+            {/* END OF ADMIN SYSTEM SUBTABS */}
+          </div>
+        )}
+
+        {/* ── 12. DEDICATED ADMIN PAYMENT ORDERS TAB ──────────── */}
+        {(activeNav === 'admin-orders' || (activeNav === 'admin' && adminSubTab === 'orders')) && (user?.role === 'admin' || user?.role === 'owner') && (
+          <div className="animate-slide-up">
+            <header className="content-header" style={{ marginBottom: '24px' }}>
+              <div>
+                <h1 className="page-title" style={{ color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <CreditCard size={24} /> <span>Payment Orders</span>
+                </h1>
+                <p className="page-subtitle">Review customer subscription payment submissions, verify transaction IDs, and release orders.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchAdminOrders}
+                disabled={loadingAdminOrders}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              >
+                <RefreshCw size={14} className={loadingAdminOrders ? 'spinner-loader' : ''} />
+                <span>Refresh Orders</span>
+              </button>
+            </header>
+
+            {/* Payment-Specific Statistics Grid */}
+            <div className="stats-grid" style={{ marginBottom: '24px' }}>
+              <div className="glass-panel stat-card indigo">
+                <div className="stat-header"><span>Total Orders</span><div className="stat-icon-container"><CreditCard size={16} /></div></div>
+                <div className="stat-value">{adminOrders.length}</div>
+              </div>
+              <div className="glass-panel stat-card warning">
+                <div className="stat-header"><span>Pending Review</span><div className="stat-icon-container"><Clock size={16} /></div></div>
+                <div className="stat-value" style={{ color: '#f59e0b' }}>
+                  {adminOrders.filter(o => o.status === 'pending').length}
+                </div>
+              </div>
+              <div className="glass-panel stat-card success">
+                <div className="stat-header"><span>Approved & Active</span><div className="stat-icon-container"><CheckCircle2 size={16} /></div></div>
+                <div className="stat-value" style={{ color: '#10b981' }}>
+                  {adminOrders.filter(o => o.status === 'approved' || o.status === 'completed').length}
+                </div>
+              </div>
+              <div className="glass-panel stat-card danger">
+                <div className="stat-header"><span>Rejected</span><div className="stat-icon-container"><AlertCircle size={16} /></div></div>
+                <div className="stat-value" style={{ color: '#ef4444' }}>
+                  {adminOrders.filter(o => o.status === 'rejected').length}
+                </div>
+              </div>
+            </div>
                 {/* Search & Filter Bar */}
                 <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '20px' }}>
                   <div className="flex-between" style={{ flexWrap: 'wrap', gap: '14px' }}>
@@ -10608,9 +10628,54 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
 
 
-            {/* ── 9. ADMIN COUPONS MANAGEMENT SUB-TAB ── */}
-            {adminSubTab === 'coupons' && (
-              <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* ── 13. DEDICATED ADMIN COUPONS TAB ─────────────────── */}
+        {(activeNav === 'admin-coupons' || (activeNav === 'admin' && adminSubTab === 'coupons')) && (user?.role === 'admin' || user?.role === 'owner') && (
+          <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <header className="content-header" style={{ marginBottom: '8px' }}>
+              <div>
+                <h1 className="page-title" style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Zap size={24} /> <span>Promo & Discount Coupons</span>
+                </h1>
+                <p className="page-subtitle">Create custom coupon codes with percentage discounts, custom timer expirations (1s to 1 month), and usage limits.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchAdminCoupons}
+                disabled={loadingCoupons}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              >
+                <RefreshCw size={14} className={loadingCoupons ? 'spinner-loader' : ''} />
+                <span>Refresh Coupons</span>
+              </button>
+            </header>
+
+            {/* Coupon-Specific Statistics Grid */}
+            <div className="stats-grid" style={{ marginBottom: '8px' }}>
+              <div className="glass-panel stat-card warning">
+                <div className="stat-header"><span>Total Coupons</span><div className="stat-icon-container"><Zap size={16} /></div></div>
+                <div className="stat-value">{adminCoupons.length}</div>
+              </div>
+              <div className="glass-panel stat-card success">
+                <div className="stat-header"><span>Active Coupons</span><div className="stat-icon-container"><CheckCircle2 size={16} /></div></div>
+                <div className="stat-value" style={{ color: '#10b981' }}>
+                  {adminCoupons.filter(c => (!c.expires_at || c.expires_at > Math.floor(Date.now() / 1000)) && (!c.max_uses || c.used_count < c.max_uses)).length}
+                </div>
+              </div>
+              <div className="glass-panel stat-card danger">
+                <div className="stat-header"><span>Expired / Maxed</span><div className="stat-icon-container"><Clock size={16} /></div></div>
+                <div className="stat-value" style={{ color: '#ef4444' }}>
+                  {adminCoupons.filter(c => (c.expires_at > 0 && c.expires_at <= Math.floor(Date.now() / 1000)) || (c.max_uses > 0 && c.used_count >= c.max_uses)).length}
+                </div>
+              </div>
+              <div className="glass-panel stat-card primary">
+                <div className="stat-header"><span>Total Redemptions</span><div className="stat-icon-container"><Users size={16} /></div></div>
+                <div className="stat-value" style={{ color: '#38bdf8' }}>
+                  {adminCoupons.reduce((sum, c) => sum + (c.used_count || 0), 0)}
+                </div>
+              </div>
+            </div>
                 
                 {/* Header info bar */}
                 <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
@@ -10914,9 +10979,28 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               </div>
             )}
 
-            {/* ── 10. ADMIN DYNAMIC BILLING & GATEWAY SETTINGS SUB-TAB ── */}
-            {adminSubTab === 'billing' && (
-              <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* ── 14. DEDICATED ADMIN BILLING & SETTINGS TAB ──────── */}
+        {(activeNav === 'admin-billing' || (activeNav === 'admin' && adminSubTab === 'billing')) && (user?.role === 'admin' || user?.role === 'owner') && (
+          <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <header className="content-header" style={{ marginBottom: '8px' }}>
+              <div>
+                <h1 className="page-title" style={{ color: '#a855f7', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Sliders size={24} /> <span>Billing & Settings</span>
+                </h1>
+                <p className="page-subtitle">Configure manual mobile banking numbers, crypto wallets, Discord webhook, and real-time subscription prices.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchPaymentSettings}
+                disabled={loadingPaymentSettings}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              >
+                <RefreshCw size={14} className={loadingPaymentSettings ? 'spinner-loader' : ''} />
+                <span>Refresh Settings</span>
+              </button>
+            </header>
                 
                 {/* Header bar */}
                 <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
@@ -11200,8 +11284,27 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               </div>
             )}
 
-            {adminSubTab === 'database' && (
-              <div className="animate-slide-up tab-animated-content">
+        {/* ── 15. DEDICATED ADMIN DATABASE HUB TAB ────────────── */}
+        {(activeNav === 'admin-database' || (activeNav === 'admin' && adminSubTab === 'database')) && (user?.role === 'admin' || user?.role === 'owner') && (
+          <div className="animate-slide-up tab-animated-content" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <header className="content-header" style={{ marginBottom: '8px' }}>
+              <div>
+                <h1 className="page-title" style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Database size={24} /> <span>Database Hub</span>
+                </h1>
+                <p className="page-subtitle">Real-time SQLite database health telemetry, table row counts, and maintenance utilities.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchDatabaseStats}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              >
+                <RefreshCw size={14} />
+                <span>Refresh Telemetry</span>
+              </button>
+            </header>
                 {/* Header bar */}
                 <div className="flex-between" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
@@ -11497,9 +11600,6 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                 </div>
 
               </div>
-            )}
-
-          </div>
         )}
 
         </div>

@@ -245,9 +245,7 @@ export async function validateCoupon(req, res) {
     const discountUsd = Math.max(0, +(origUsd * (1 - coupon.discount_percent / 100)).toFixed(2));
     const discountBdt = Math.max(0, Math.round(origBdt * (1 - coupon.discount_percent / 100)));
 
-    return res.json({
-      success: true,
-      valid: true,
+    const couponData = {
       code: coupon.code,
       discount_percent: coupon.discount_percent,
       expires_at: coupon.expires_at,
@@ -256,6 +254,13 @@ export async function validateCoupon(req, res) {
       original_bdt: origBdt,
       discounted_bdt: discountBdt,
       savings_text: `${coupon.discount_percent}% OFF`
+    };
+
+    return res.json({
+      success: true,
+      valid: true,
+      coupon: couponData,
+      ...couponData
     });
 
   } catch (err) {

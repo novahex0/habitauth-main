@@ -183,8 +183,9 @@ export default function PaymentPage() {
       });
 
       const data = await res.json();
-      if (data.success && data.coupon) {
-        setAppliedCoupon(data.coupon);
+      const validCoupon = data.coupon || (data.valid || data.success ? data : null);
+      if (data.success && validCoupon && (validCoupon.code || validCoupon.discount_percent)) {
+        setAppliedCoupon(validCoupon);
         setCouponError('');
       } else {
         setAppliedCoupon(null);
@@ -914,16 +915,17 @@ export default function PaymentPage() {
               <div style={{ marginBottom: '14px' }}>
                 <input
                   type="text"
+                  className="payment-white-input"
                   value={trxId}
                   onChange={(e) => setTrxId(e.target.value.toUpperCase())}
                   placeholder={lang === 'bn' ? "ট্রানজেকশন আইডি দিন" : "Enter Transaction ID"}
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     height: '48px', padding: '12px 16px', borderRadius: '8px',
-                    border: 'none', fontSize: '15px', fontWeight: 800,
+                    border: '2px solid #cbd5e1', fontSize: '15px', fontWeight: 800,
                     fontFamily: 'monospace', textAlign: 'center',
-                    background: '#ffffff', color: '#0f172a',
-                    boxShadow: '0 3px 10px rgba(0,0,0,0.12)',
+                    background: '#ffffff', color: '#000000',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     outline: 'none'
                   }}
                   required
@@ -934,6 +936,7 @@ export default function PaymentPage() {
               <div style={{ marginBottom: '16px' }}>
                 <input
                   type="text"
+                  className="payment-white-input"
                   value={senderNumber}
                   onChange={(e) => setSenderNumber(e.target.value)}
                   placeholder={activeTab === 'mobile_banking' 
@@ -942,10 +945,10 @@ export default function PaymentPage() {
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     height: '44px', padding: '10px 16px', borderRadius: '8px',
-                    border: 'none', fontSize: '13px', fontWeight: 700,
+                    border: '2px solid #cbd5e1', fontSize: '13px', fontWeight: 700,
                     fontFamily: 'monospace', textAlign: 'center',
-                    background: '#ffffff', color: '#0f172a',
-                    boxShadow: '0 3px 10px rgba(0,0,0,0.12)',
+                    background: '#ffffff', color: '#000000',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     outline: 'none'
                   }}
                   required

@@ -726,7 +726,34 @@ textarea,
   font-size: 13.5px;
   font-family: var(--font-sans);
   outline: none;
-  transition: var(--transition);
+}
+
+/* Explicit Solid White Inputs for Payment Checkout Verification */
+input.payment-white-input,
+.payment-white-input {
+  background: #ffffff !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  border: 2px solid #cbd5e1 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15) !important;
+  font-weight: 800 !important;
+}
+
+input.payment-white-input::placeholder,
+.payment-white-input::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+input.payment-white-input:focus,
+.payment-white-input:focus {
+  background: #ffffff !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.25) !important;
 }
 
 /* Explicit Reset for Checkboxes & Radios */
