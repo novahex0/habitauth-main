@@ -1,10 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Zap, Shield, Sparkles, ArrowRight, Star, Crown } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext.jsx';
+
+function formatDisplayPrice(num, lang) {
+  if (num === 0 || num === '0') return lang === 'bn' ? '$০' : '$0';
+  const val = typeof num === 'number' ? num : parseFloat(num) || 0;
+  const str = val % 1 === 0 ? String(val) : val.toFixed(2);
+  if (lang === 'bn') {
+    const bn = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return '$' + str.replace(/[0-9]/g, (w) => bn[+w]);
+  }
+  return '$' + str;
+}
 
 export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate }) {
   const { t, language } = useLanguage();
   const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
+  const [dynamicPrices, setDynamicPrices] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/v1/payment/config')
+      .then(r => r.json())
+      .then(d => {
+        if (isMounted && d.success && d.config?.prices) {
+          setDynamicPrices(d.config.prices);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
+  const devUsd = dynamicPrices?.developer?.[billingCycle]?.usd ?? (billingCycle === 'monthly' ? 1.20 : 12.00);
+  const proUsd = dynamicPrices?.pro?.[billingCycle]?.usd ?? (billingCycle === 'monthly' ? 3.20 : 32.00);
 
   // Dynamic translated plan details based on current language
   const plansData = {
@@ -35,8 +63,8 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
         id: 'developer',
         name: 'Developer',
         badge: 'Most Popular',
-        price: billingCycle === 'monthly' ? '$1.20' : '$12',
-        rawPrice: billingCycle === 'monthly' ? '1.20' : '12',
+        price: formatDisplayPrice(devUsd, 'en'),
+        rawPrice: devUsd,
         period: billingCycle === 'monthly' ? '/ month' : '/ year (save 17%)',
         description: 'Everything you need to secure, license, and distribute your software.',
         features: [
@@ -59,8 +87,8 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
         id: 'pro',
         name: 'Pro Developer',
         badge: 'Ultimate Power',
-        price: billingCycle === 'monthly' ? '$3.20' : '$32',
-        rawPrice: billingCycle === 'monthly' ? '3.20' : '32',
+        price: formatDisplayPrice(proUsd, 'en'),
+        rawPrice: proUsd,
         period: billingCycle === 'monthly' ? '/ month' : '/ year (save 17%)',
         description: 'Maximum scale, custom branding, and priority infrastructure for commercial software.',
         features: [
@@ -107,8 +135,8 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
         id: 'developer',
         name: 'ডেভেলপার',
         badge: 'সর্বাধিক জনপ্রিয়',
-        price: billingCycle === 'monthly' ? '$১.২০' : '$১২',
-        rawPrice: billingCycle === 'monthly' ? '1.20' : '12',
+        price: formatDisplayPrice(devUsd, 'bn'),
+        rawPrice: devUsd,
         period: billingCycle === 'monthly' ? '/ মাস' : '/ বছর (১৭% সাশ্রয়)',
         description: 'আপনার সফটওয়্যার সুরক্ষিত, লাইসেন্সিং ও ডিস্ট্রিবিউশনের জন্য প্রয়োজনীয় সবকিছু।',
         features: [
@@ -131,8 +159,8 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
         id: 'pro',
         name: 'প্রো ডেভেলপার',
         badge: 'সর্বোচ্চ ক্ষমতা',
-        price: billingCycle === 'monthly' ? '$৩.২০' : '$৩২',
-        rawPrice: billingCycle === 'monthly' ? '3.20' : '32',
+        price: formatDisplayPrice(proUsd, 'bn'),
+        rawPrice: proUsd,
         period: billingCycle === 'monthly' ? '/ মাস' : '/ বছর (১৭% সাশ্রয়)',
         description: 'কমার্শিয়াল সফটওয়্যার ও বড় টিমের জন্য সর্বোচ্চ স্কেল, কাস্টম ব্র্যান্ডিং ও ভিআইপি সাপোর্ট।',
         features: [
@@ -141,9 +169,9 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
           'ডেভেলপার প্ল্যানের সমস্ত ফিচার',
           'কাস্টম লাইসেন্স কি প্রিফিক্স',
           '৫০০+ টিম মেম্বার ক্যাপাসিটি',
-          'ডেডিকেটেড ভিআইপি ডিসকর্ড রোল',
+          'ডেডিকেটেড VIP ডিসকর্ড রোল',
           'টেলিগ্রাম বট সিকিউরিটি নোটিফিকেশন',
-          'অগ্রাধিকারভিত্তিক ২৪/৭ ভিআইপি সাপোর্ট'
+          'অগ্রাধিকারভিত্তিক ২৪/৭ VIP সাপোর্ট'
         ],
         ctaText: 'প্রো অ্যাক্সেস নিন',
         popular: false,

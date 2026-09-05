@@ -1,61 +1,81 @@
 import { db } from '../config/db.js';
 import { v4 as uuidv4 } from 'uuid';
 
-export const GATEWAY_CONFIG = {
-  prices: {
+/**
+ * Reads dynamic pricing, gateway details, and webhook URL from system_settings with default fallbacks
+ */
+export function getDynamicGatewayConfig() {
+  const rows = db.prepare('SELECT key, value FROM system_settings').all();
+  const settings = {};
+  rows.forEach(r => { settings[r.key] = r.value; });
+
+  const prices = {
     developer: {
-      monthly: { usd: 1.20, bdt: 150 },
-      yearly: { usd: 12.00, bdt: 1500 }
+      monthly: {
+        usd: parseFloat(settings['payment_price_dev_monthly_usd'] || '1.20'),
+        bdt: parseInt(settings['payment_price_dev_monthly_bdt'] || '150', 10)
+      },
+      yearly: {
+        usd: parseFloat(settings['payment_price_dev_yearly_usd'] || '12.00'),
+        bdt: parseInt(settings['payment_price_dev_yearly_bdt'] || '1500', 10)
+      }
     },
     pro: {
-      monthly: { usd: 3.20, bdt: 400 },
-      yearly: { usd: 32.00, bdt: 4000 }
+      monthly: {
+        usd: parseFloat(settings['payment_price_pro_monthly_usd'] || '3.20'),
+        bdt: parseInt(settings['payment_price_pro_monthly_bdt'] || '400', 10)
+      },
+      yearly: {
+        usd: parseFloat(settings['payment_price_pro_yearly_usd'] || '32.00'),
+        bdt: parseInt(settings['payment_price_pro_yearly_bdt'] || '4000', 10)
+      }
     }
-  },
-  gateways: {
+  };
+
+  const gateways = {
     bkash: {
       id: 'bkash',
       name: 'bKash',
-      badge: 'Most Popular (BD)',
+      badge: 'Send Money',
       color: '#e2136e',
       type: 'mobile_banking',
-      number: '01939336831',
+      number: settings['payment_bkash_number'] || '01939336831',
       accountType: 'Personal (Send Money)',
       currency: 'BDT',
-      instructions: 'bKash অ্যাপ বা *247# এ গিয়ে "Send Money" করুন এই নম্বরে। ট্রানজেকশন সফল হলে ৮-১০ সংখ্যার TrxID এবং আপনার যে নম্বর থেকে টাকা পাঠিয়েছেন তা নিচে দিন।'
+      instructions: 'bKash অ্যাপ বা *247# এ গিয়ে "Send Money" করুন। ট্রানজেকশন সফল হলে ৮-১০ সংখ্যার TrxID এবং আপনার বিকাশ নম্বর নিচে দিন।'
     },
     rocket: {
       id: 'rocket',
       name: 'Rocket',
-      badge: 'Fast (BD)',
+      badge: 'Send Money',
       color: '#8c3494',
       type: 'mobile_banking',
-      number: '01939336831',
+      number: settings['payment_rocket_number'] || '01939336831',
       accountType: 'Personal (Send Money)',
       currency: 'BDT',
-      instructions: 'Rocket অ্যাপ বা *322# এ গিয়ে "Send Money" করুন এই নম্বরে। সফল হলে TrxID এবং আপনার রকেট নম্বর নিচে দিন।'
+      instructions: 'Rocket অ্যাপ বা *322# এ গিয়ে "Send Money" করুন। সফল হলে TrxID এবং আপনার রকেট নম্বর নিচে দিন।'
     },
     nagad: {
       id: 'nagad',
       name: 'Nagad',
-      badge: 'Instant (BD)',
+      badge: 'Send Money',
       color: '#f7941d',
       type: 'mobile_banking',
-      number: '01925188754',
+      number: settings['payment_nagad_number'] || '01925188754',
       accountType: 'Personal (Send Money)',
       currency: 'BDT',
-      instructions: 'Nagad অ্যাপ বা *167# এ গিয়ে "Send Money" করুন এই নম্বরে। সফল হলে ৮ সংখ্যার TrxID এবং আপনার নগদ নম্বর নিচে দিন।'
+      instructions: 'Nagad অ্যাপ বা *167# এ গিয়ে "Send Money" করুন। সফল হলে ৮ সংখ্যার TrxID এবং আপনার নগদ নম্বর নিচে দিন।'
     },
     binance_pay: {
       id: 'binance_pay',
       name: 'Binance Pay',
-      badge: 'Zero Fee',
+      badge: '0 Fee',
       color: '#f59e0b',
       type: 'crypto_pay',
-      payId: '1025707697',
+      payId: settings['payment_binance_pay_id'] || '1025707697',
       accountType: 'Binance Pay ID (0 Fee)',
       currency: 'USDT',
-      instructions: 'Open Binance App > Pay > Send > Enter Pay ID: 1025707697. After sending, copy your Binance Order ID / Pay ID and paste below.'
+      instructions: 'Open Binance App > Pay > Send > Enter Pay ID: ' + (settings['payment_binance_pay_id'] || '1025707697') + '. Paste Order ID below.'
     },
     trc20: {
       id: 'trc20',
@@ -63,29 +83,98 @@ export const GATEWAY_CONFIG = {
       badge: 'USDT / TRX',
       color: '#06b6d4',
       type: 'crypto_onchain',
-      address: 'TFtpThLcVSbR6KKEExWg2UiWibUvFc1AG3',
+      address: settings['payment_trc20_address'] || 'TFtpThLcVSbR6KKEExWg2UiWibUvFc1AG3',
       network: 'TRON (TRC20)',
       acceptedCurrencies: ['USDT (TRC20)', 'TRX'],
       currency: 'USDT',
       qrCodeUrl: '/binance-qr.png',
-      instructions: 'Send USDT (TRC-20) or TRX to the TRON wallet address. After transaction completes, copy the 64-character Transaction Hash (TxID) and paste below.'
+      instructions: 'Send USDT (TRC-20) or TRX to TRON wallet. Once confirmed on TronScan, copy the 64-char TxID and paste below.'
     }
-  }
-};
+  };
+
+  const discordWebhook = settings['payment_discord_webhook'] || 'https://discord.com/api/webhooks/1479836371109154948/k2B8x1V_9vj9E_tVq5qg6R_yS2J_3Z';
+
+  return { prices, gateways, discordWebhook };
+}
 
 /**
  * GET /api/v1/payment/config
- * Returns public payment gateways and pricing details
+ * Returns public dynamic payment gateways and pricing details
  */
 export async function getPaymentConfig(req, res) {
   try {
+    const { prices, gateways } = getDynamicGatewayConfig();
     return res.json({
       success: true,
-      config: GATEWAY_CONFIG
+      config: { prices, gateways }
     });
   } catch (err) {
     console.error('[Payment Config Error]:', err);
     return res.status(500).json({ success: false, message: 'Failed to load payment configuration.' });
+  }
+}
+
+/**
+ * POST /api/v1/payment/validate-coupon
+ * Validates a coupon code, checking expiration and usage limits, and calculates discounted prices
+ */
+export async function validateCoupon(req, res) {
+  try {
+    const { code, plan = 'developer', billing_cycle = 'monthly' } = req.body;
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ success: false, message: 'Please enter a coupon code.' });
+    }
+
+    const cleanCode = code.trim().toUpperCase();
+    const coupon = db.prepare('SELECT * FROM coupons WHERE UPPER(code) = ?').get(cleanCode);
+
+    if (!coupon || !coupon.is_active) {
+      return res.status(400).json({ success: false, message: 'Invalid or inactive coupon code.' });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+
+    // Check expiration timer (1s to 1 month)
+    if (coupon.expires_at > 0 && coupon.expires_at < now) {
+      return res.status(400).json({
+        success: false,
+        code: 'COUPON_EXPIRED',
+        message: 'This coupon code has expired.'
+      });
+    }
+
+    // Check maximum usage count
+    if (coupon.max_uses > 0 && coupon.used_count >= coupon.max_uses) {
+      return res.status(400).json({
+        success: false,
+        code: 'COUPON_MAX_USES_REACHED',
+        message: 'This coupon has reached its maximum redemption limit.'
+      });
+    }
+
+    const { prices } = getDynamicGatewayConfig();
+    const origUsd = prices[plan]?.[billing_cycle]?.usd || 1.20;
+    const origBdt = prices[plan]?.[billing_cycle]?.bdt || 150;
+
+    const discountUsd = Math.max(0, +(origUsd * (1 - coupon.discount_percent / 100)).toFixed(2));
+    const discountBdt = Math.max(0, Math.round(origBdt * (1 - coupon.discount_percent / 100)));
+
+    return res.json({
+      success: true,
+      valid: true,
+      code: coupon.code,
+      discount_percent: coupon.discount_percent,
+      expires_at: coupon.expires_at,
+      original_usd: origUsd,
+      discounted_usd: discountUsd,
+      original_bdt: origBdt,
+      discounted_bdt: discountBdt,
+      savings_text: `${coupon.discount_percent}% OFF`
+    });
+
+  } catch (err) {
+    console.error('[Validate Coupon Error]:', err);
+    return res.status(500).json({ success: false, message: 'Server error validating coupon.' });
   }
 }
 
@@ -105,7 +194,8 @@ export async function submitPaymentOrder(req, res) {
       billing_cycle = 'monthly', 
       payment_method, 
       sender_number, 
-      txid 
+      txid,
+      coupon_code
     } = req.body;
 
     // 1. Validation
@@ -117,7 +207,8 @@ export async function submitPaymentOrder(req, res) {
       return res.status(400).json({ success: false, message: 'Invalid billing cycle.' });
     }
 
-    const gateway = GATEWAY_CONFIG.gateways[payment_method];
+    const config = getDynamicGatewayConfig();
+    const gateway = config.gateways[payment_method];
     if (!gateway) {
       return res.status(400).json({ success: false, message: 'Invalid payment method selected.' });
     }
@@ -202,11 +293,33 @@ export async function submitPaymentOrder(req, res) {
       }
     }
 
-    // 4. Calculate Expected Price and Target Destination
+    // 4. Calculate Price (with Coupon if provided)
     const isBdt = gateway.currency === 'BDT';
-    const amount = isBdt 
-      ? GATEWAY_CONFIG.prices[plan][billing_cycle].bdt
-      : GATEWAY_CONFIG.prices[plan][billing_cycle].usd;
+    let baseAmount = isBdt 
+      ? config.prices[plan][billing_cycle].bdt
+      : config.prices[plan][billing_cycle].usd;
+    
+    let originalAmount = baseAmount;
+    let finalAmount = baseAmount;
+    let appliedCoupon = null;
+    let discountPercent = 0;
+
+    if (coupon_code) {
+      const cleanCoupon = coupon_code.trim().toUpperCase();
+      const nowTs = Math.floor(Date.now() / 1000);
+      const cpn = db.prepare('SELECT * FROM coupons WHERE UPPER(code) = ?').get(cleanCoupon);
+
+      if (cpn && cpn.is_active && (cpn.expires_at === 0 || cpn.expires_at >= nowTs) && (cpn.max_uses === 0 || cpn.used_count < cpn.max_uses)) {
+        appliedCoupon = cpn;
+        discountPercent = cpn.discount_percent;
+        if (isBdt) {
+          finalAmount = Math.max(0, Math.round(baseAmount * (1 - discountPercent / 100)));
+        } else {
+          finalAmount = Math.max(0, +(baseAmount * (1 - discountPercent / 100)).toFixed(2));
+        }
+      }
+    }
+
     const currency = gateway.currency;
     const toAddress = gateway.number || gateway.payId || gateway.address;
 
@@ -218,24 +331,40 @@ export async function submitPaymentOrder(req, res) {
       INSERT INTO crypto_payments (
         id, user_id, plan, billing_cycle, amount, currency,
         txid, from_address, to_address, payment_method, sender_number,
-        admin_notes, reviewed_at, reviewed_by, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 0, '', 'pending', ?)
+        admin_notes, reviewed_at, reviewed_by, status, created_at,
+        coupon_code, discount_percent, original_amount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 0, '', 'pending', ?, ?, ?, ?)
     `).run(
       orderId,
       userId,
       plan,
       billing_cycle,
-      amount,
+      finalAmount,
       currency,
       cleanTxId,
       cleanSender,
       toAddress,
       payment_method,
       cleanSender,
-      now
+      now,
+      appliedCoupon?.code || '',
+      discountPercent,
+      originalAmount
     );
 
-    // 6. In-App Notification for User
+    // 6. If coupon used, increment count and log redemption
+    if (appliedCoupon) {
+      try {
+        db.prepare('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?').run(appliedCoupon.id);
+        const redId = `red_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+        db.prepare(`
+          INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, discount_percent, redeemed_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(redId, appliedCoupon.id, userId, orderId, discountPercent, now);
+      } catch (cpnErr) {}
+    }
+
+    // 7. In-App Notification for User
     try {
       const notifId = `notif_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
       db.prepare(`
@@ -250,12 +379,32 @@ export async function submitPaymentOrder(req, res) {
       );
     } catch (notifErr) {}
 
-    // 7. Instant Rich Discord Alert to Admin Webhook
+    // 8. Rich Discord Alert to Configured Webhook
     try {
       const userRecord = db.prepare('SELECT username, email FROM accounts WHERE id = ?').get(userId);
-      const discordWebhook = process.env.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1479836371109154948/k2B8x1V_9vj9E_tVq5qg6R_yS2J_3Z';
+      const discordWebhook = config.discordWebhook;
       
       if (discordWebhook && discordWebhook.startsWith('https://')) {
+        const fields = [
+          { name: '👤 Username', value: userRecord?.username || 'Unknown', inline: true },
+          { name: '📧 Email', value: userRecord?.email || 'Unknown', inline: true },
+          { name: '📦 Selected Plan', value: `${plan.toUpperCase()} (${billing_cycle})`, inline: true },
+          { name: '💳 Gateway', value: `${gateway.name} (${gateway.accountType || ''})`, inline: true },
+          { name: '💰 Final Amount', value: `**${currency === 'BDT' ? '৳' : '$'}${finalAmount} ${currency}**`, inline: true },
+          { name: '📱 Sender Info', value: `\`${cleanSender}\``, inline: true },
+          { name: '🧾 TrxID / TxID', value: `\`${cleanTxId}\``, inline: false },
+          { name: '🆔 Order ID', value: `\`${orderId}\``, inline: true },
+          { name: '🕒 Status', value: '⏳ **PENDING ADMIN REVIEW**', inline: true }
+        ];
+
+        if (appliedCoupon) {
+          fields.splice(5, 0, {
+            name: '🎫 Coupon Applied',
+            value: `\`${appliedCoupon.code}\` (${discountPercent}% OFF) • Orig: ${currency === 'BDT' ? '৳' : '$'}${originalAmount}`,
+            inline: false
+          });
+        }
+
         const payload = {
           username: 'Habit Auth Payment Alert',
           avatar_url: 'https://habitauth.onrender.com/assets/logo.png',
@@ -263,18 +412,8 @@ export async function submitPaymentOrder(req, res) {
             {
               title: `⏳ New Payment Order: ${gateway.name}`,
               description: `A user has submitted a new payment order awaiting admin review and plan release.`,
-              color: 0xf59e0b, // Amber / Pending
-              fields: [
-                { name: '👤 Username', value: userRecord?.username || 'Unknown', inline: true },
-                { name: '📧 Email', value: userRecord?.email || 'Unknown', inline: true },
-                { name: '📦 Selected Plan', value: `${plan.toUpperCase()} (${billing_cycle})`, inline: true },
-                { name: '💳 Gateway', value: `${gateway.name} (${gateway.accountType || ''})`, inline: true },
-                { name: '💰 Amount', value: `${currency === 'BDT' ? '৳' : '$'}${amount} ${currency}`, inline: true },
-                { name: '📱 Sender Info', value: `\`${cleanSender}\``, inline: true },
-                { name: '🧾 TrxID / TxID', value: `\`${cleanTxId}\``, inline: false },
-                { name: '🆔 Order ID', value: `\`${orderId}\``, inline: true },
-                { name: '🕒 Status', value: '⏳ **PENDING ADMIN REVIEW**', inline: true }
-              ],
+              color: 0xf59e0b,
+              fields,
               footer: { text: 'Habit Auth Billing Engine • Open Admin Panel to Approve' },
               timestamp: new Date().toISOString()
             }
@@ -298,11 +437,13 @@ export async function submitPaymentOrder(req, res) {
         id: orderId,
         plan,
         billing_cycle,
-        amount,
+        amount: finalAmount,
         currency,
         payment_method,
         sender_number: cleanSender,
         txid: cleanTxId,
+        coupon_code: appliedCoupon?.code || '',
+        discount_percent: discountPercent,
         status: 'pending',
         created_at: now
       }
@@ -329,6 +470,7 @@ export async function getUserOrders(req, res) {
       SELECT 
         id, plan, billing_cycle, amount, currency, txid,
         payment_method, sender_number, to_address,
+        coupon_code, discount_percent, original_amount,
         status, admin_notes, created_at, reviewed_at
       FROM crypto_payments
       WHERE user_id = ?
@@ -361,8 +503,7 @@ export async function getAdminOrders(req, res) {
         cp.*,
         a.username,
         a.email,
-        a.role as current_role,
-        a.plan as current_plan
+        a.role as current_role
       FROM crypto_payments cp
       LEFT JOIN accounts a ON cp.user_id = a.id
       ORDER BY cp.created_at DESC
@@ -453,7 +594,7 @@ export async function reviewOrder(req, res) {
 
       // 5. Discord Webhook Notification
       try {
-        const discordWebhook = process.env.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1479836371109154948/k2B8x1V_9vj9E_tVq5qg6R_yS2J_3Z';
+        const { discordWebhook } = getDynamicGatewayConfig();
         if (discordWebhook && discordWebhook.startsWith('https://')) {
           fetch(discordWebhook, {
             method: 'POST',
@@ -464,7 +605,7 @@ export async function reviewOrder(req, res) {
               embeds: [{
                 title: '✅ Payment Order APPROVED & Subscription Activated',
                 description: `Admin **${adminUser.username}** approved order \`${id}\`. User has been upgraded to **${order.plan.toUpperCase()}** plan.`,
-                color: 0x10b981, // Green
+                color: 0x10b981,
                 fields: [
                   { name: '🆔 Order ID', value: `\`${id}\``, inline: true },
                   { name: '📦 Plan', value: `${order.plan.toUpperCase()} (${order.billing_cycle})`, inline: true },
@@ -518,5 +659,315 @@ export async function reviewOrder(req, res) {
   } catch (err) {
     console.error('[Review Order Error]:', err);
     return res.status(500).json({ success: false, message: 'Server error reviewing payment order.' });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// ── COUPON MANAGEMENT CONTROLLERS (ADMIN) ────────────────────
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/admin/coupons
+ * Admin fetches all coupons with live status calculations
+ */
+export async function getAdminCoupons(req, res) {
+  try {
+    const user = req.user;
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const coupons = db.prepare('SELECT * FROM coupons ORDER BY created_at DESC').all();
+
+    const formatted = coupons.map(c => {
+      const isExpired = c.expires_at > 0 && c.expires_at < now;
+      const isMaxedOut = c.max_uses > 0 && c.used_count >= c.max_uses;
+      const secondsLeft = c.expires_at > 0 ? Math.max(0, c.expires_at - now) : null;
+
+      return {
+        ...c,
+        is_expired: isExpired,
+        is_maxed_out: isMaxedOut,
+        seconds_left: secondsLeft,
+        status_label: !c.is_active ? 'Disabled' : isExpired ? 'Expired' : isMaxedOut ? 'Maxed Out' : 'Active'
+      };
+    });
+
+    return res.json({
+      success: true,
+      coupons: formatted
+    });
+  } catch (err) {
+    console.error('[Get Admin Coupons Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch coupons.' });
+  }
+}
+
+/**
+ * POST /api/v1/admin/coupons
+ * Admin creates a new custom coupon code with custom timer (1s to 1 month)
+ */
+export async function createCoupon(req, res) {
+  try {
+    const user = req.user;
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    const { 
+      code, 
+      discount_percent, 
+      duration_value = 0, 
+      duration_unit = 'hours', 
+      max_uses = 0 
+    } = req.body;
+
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ success: false, message: 'Please provide a coupon code.' });
+    }
+
+    const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (cleanCode.length < 2) {
+      return res.status(400).json({ success: false, message: 'Coupon code must be at least 2 characters.' });
+    }
+
+    const discount = parseInt(discount_percent, 10);
+    if (isNaN(discount) || discount < 1 || discount > 100) {
+      return res.status(400).json({ success: false, message: 'Discount must be between 1% and 100%.' });
+    }
+
+    // Check duplicate code
+    const existing = db.prepare('SELECT id FROM coupons WHERE UPPER(code) = ?').get(cleanCode);
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'A coupon with this code already exists.' });
+    }
+
+    // Calculate expiration timer in seconds (supports 1s to 30 days)
+    const val = parseInt(duration_value, 10) || 0;
+    let multiplier = 1;
+    if (duration_unit === 'minutes') multiplier = 60;
+    else if (duration_unit === 'hours') multiplier = 3600;
+    else if (duration_unit === 'days') multiplier = 86400;
+    else if (duration_unit === 'months') multiplier = 30 * 86400;
+
+    let durationSeconds = val * multiplier;
+    // Cap at 31 days max
+    if (durationSeconds > 31 * 86400) {
+      durationSeconds = 31 * 86400;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const expiresAt = durationSeconds > 0 ? (now + durationSeconds) : 0;
+    const couponId = `cpn_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+
+    db.prepare(`
+      INSERT INTO coupons (
+        id, code, discount_percent, expires_at, duration_seconds,
+        max_uses, used_count, is_active, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)
+    `).run(
+      couponId,
+      cleanCode,
+      discount,
+      expiresAt,
+      durationSeconds,
+      parseInt(max_uses, 10) || 0,
+      user.username || 'admin',
+      now
+    );
+
+    return res.json({
+      success: true,
+      message: `Coupon ${cleanCode} created with ${discount}% discount!`,
+      coupon: {
+        id: couponId,
+        code: cleanCode,
+        discount_percent: discount,
+        expires_at: expiresAt,
+        duration_seconds: durationSeconds,
+        max_uses: parseInt(max_uses, 10) || 0
+      }
+    });
+
+  } catch (err) {
+    console.error('[Create Coupon Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to create coupon.' });
+  }
+}
+
+/**
+ * DELETE /api/v1/admin/coupons/:id
+ * Admin deletes or disables a coupon
+ */
+export async function deleteCoupon(req, res) {
+  try {
+    const user = req.user;
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    const { id } = req.params;
+    db.prepare('DELETE FROM coupons WHERE id = ?').run(id);
+
+    return res.json({
+      success: true,
+      message: 'Coupon deleted successfully.'
+    });
+  } catch (err) {
+    console.error('[Delete Coupon Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to delete coupon.' });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// ── PAYMENT SETTINGS & DISCORD WEBHOOK CONTROLLERS (ADMIN) ───
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/admin/payment-settings
+ * Admin fetches all editable prices, numbers, and webhook URL
+ */
+export async function getPaymentSettings(req, res) {
+  try {
+    const user = req.user;
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    const config = getDynamicGatewayConfig();
+
+    return res.json({
+      success: true,
+      settings: {
+        price_dev_monthly_usd: config.prices.developer.monthly.usd,
+        price_dev_monthly_bdt: config.prices.developer.monthly.bdt,
+        price_dev_yearly_usd: config.prices.developer.yearly.usd,
+        price_dev_yearly_bdt: config.prices.developer.yearly.bdt,
+        price_pro_monthly_usd: config.prices.pro.monthly.usd,
+        price_pro_monthly_bdt: config.prices.pro.monthly.bdt,
+        price_pro_yearly_usd: config.prices.pro.yearly.usd,
+        price_pro_yearly_bdt: config.prices.pro.yearly.bdt,
+        bkash_number: config.gateways.bkash.number,
+        rocket_number: config.gateways.rocket.number,
+        nagad_number: config.gateways.nagad.number,
+        binance_pay_id: config.gateways.binance_pay.payId,
+        trc20_address: config.gateways.trc20.address,
+        discord_webhook_url: config.discordWebhook
+      }
+    });
+  } catch (err) {
+    console.error('[Get Payment Settings Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch payment settings.' });
+  }
+}
+
+/**
+ * PUT /api/v1/admin/payment-settings
+ * Admin updates pricing, gateway numbers, and Discord webhook URL
+ */
+export async function updatePaymentSettings(req, res) {
+  try {
+    const user = req.user;
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    const {
+      price_dev_monthly_usd,
+      price_dev_monthly_bdt,
+      price_dev_yearly_usd,
+      price_dev_yearly_bdt,
+      price_pro_monthly_usd,
+      price_pro_monthly_bdt,
+      price_pro_yearly_usd,
+      price_pro_yearly_bdt,
+      bkash_number,
+      rocket_number,
+      nagad_number,
+      binance_pay_id,
+      trc20_address,
+      discord_webhook_url
+    } = req.body;
+
+    const now = Math.floor(Date.now() / 1000);
+    const setSetting = (key, val) => {
+      if (val !== undefined && val !== null) {
+        db.prepare('INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, ?)').run(key, String(val).trim(), now);
+      }
+    };
+
+    setSetting('payment_price_dev_monthly_usd', price_dev_monthly_usd);
+    setSetting('payment_price_dev_monthly_bdt', price_dev_monthly_bdt);
+    setSetting('payment_price_dev_yearly_usd', price_dev_yearly_usd);
+    setSetting('payment_price_dev_yearly_bdt', price_dev_yearly_bdt);
+    setSetting('payment_price_pro_monthly_usd', price_pro_monthly_usd);
+    setSetting('payment_price_pro_monthly_bdt', price_pro_monthly_bdt);
+    setSetting('payment_price_pro_yearly_usd', price_pro_yearly_usd);
+    setSetting('payment_price_pro_yearly_bdt', price_pro_yearly_bdt);
+
+    setSetting('payment_bkash_number', bkash_number);
+    setSetting('payment_rocket_number', rocket_number);
+    setSetting('payment_nagad_number', nagad_number);
+    setSetting('payment_binance_pay_id', binance_pay_id);
+    setSetting('payment_trc20_address', trc20_address);
+
+    if (discord_webhook_url !== undefined) {
+      setSetting('payment_discord_webhook', discord_webhook_url);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Payment settings and live prices updated successfully!'
+    });
+
+  } catch (err) {
+    console.error('[Update Payment Settings Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to update payment settings.' });
+  }
+}
+
+/**
+ * POST /api/v1/admin/test-webhook
+ * Sends a test ping to the configured Discord webhook URL
+ */
+export async function testDiscordWebhook(req, res) {
+  try {
+    const user = req.user;
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    const { webhook_url } = req.body;
+    const targetUrl = webhook_url || getDynamicGatewayConfig().discordWebhook;
+
+    if (!targetUrl || !targetUrl.startsWith('https://')) {
+      return res.status(400).json({ success: false, message: 'Invalid Discord Webhook URL.' });
+    }
+
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'Habit Auth Billing Test',
+        avatar_url: 'https://habitauth.onrender.com/assets/logo.png',
+        embeds: [{
+          title: '🔔 Discord Webhook Test Successful',
+          description: `Test alert triggered by admin **${user.username}**. Your payment notification webhook is active and functioning properly!`,
+          color: 0x38bdf8,
+          timestamp: new Date().toISOString()
+        }]
+      })
+    });
+
+    if (response.ok || response.status === 204) {
+      return res.json({ success: true, message: 'Test message sent to Discord successfully!' });
+    } else {
+      return res.status(400).json({ success: false, message: `Discord returned HTTP ${response.status}. Check the webhook URL.` });
+    }
+
+  } catch (err) {
+    console.error('[Test Webhook Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to reach Discord webhook: ' + err.message });
   }
 }

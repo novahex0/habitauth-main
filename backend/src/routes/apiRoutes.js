@@ -51,6 +51,8 @@ import {
 } from '../controllers/blacklistController.js';
 import { 
   getPaymentConfig, submitPaymentOrder, getUserOrders, getAdminOrders, reviewOrder,
+  validateCoupon, getAdminCoupons, createCoupon, deleteCoupon,
+  getPaymentSettings, updatePaymentSettings, testDiscordWebhook,
   getPaymentConfig as getCryptoConfig, submitPaymentOrder as verifyCryptoPayment
 } from '../controllers/paymentController.js';
 
@@ -247,12 +249,21 @@ router.post('/audit-logs/purge', authenticateUser, purgeAuditLogs);
 router.post('/audit-logs/retention/simulate', authenticateUser, simulateRetentionDay);
 router.get('/audit-logs/export', authenticateUser, exportAuditLogsBackup);
 
-// ── 11. MULTI-GATEWAY PAYMENTS & ORDERS (BKASH, ROCKET, NAGAD, BINANCE, TRC20) ──
+// ── 11. MULTI-GATEWAY PAYMENTS, ORDERS & COUPONS ──
 router.get('/payment/config', getPaymentConfig);
+router.post('/payment/validate-coupon', validateCoupon);
 router.post('/payment/submit-order', authenticateUser, submitPaymentOrder);
 router.post('/payment/verify-crypto', authenticateUser, submitPaymentOrder);
 router.get('/payment/my-orders', authenticateUser, getUserOrders);
+
+// ── 11b. ADMIN PAYMENT ORDERS, COUPONS & SETTINGS ──
 router.get('/admin/payment-orders', authenticateUser, requireAdmin, getAdminOrders);
 router.post('/admin/payment-orders/:id/review', authenticateUser, requireAdmin, reviewOrder);
+router.get('/admin/coupons', authenticateUser, requireAdmin, getAdminCoupons);
+router.post('/admin/coupons', authenticateUser, requireAdmin, createCoupon);
+router.delete('/admin/coupons/:id', authenticateUser, requireAdmin, deleteCoupon);
+router.get('/admin/payment-settings', authenticateUser, requireAdmin, getPaymentSettings);
+router.put('/admin/payment-settings', authenticateUser, requireAdmin, updatePaymentSettings);
+router.post('/admin/test-webhook', authenticateUser, requireAdmin, testDiscordWebhook);
 
 export default router;

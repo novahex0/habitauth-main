@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, Check, Copy, Shield, Zap, Sparkles, ExternalLink, 
   ArrowRight, CheckCircle2, AlertCircle, RefreshCw, QrCode, Wallet,
-  PhoneCall, Clock, FileText, Smartphone
+  PhoneCall, Clock, FileText, Smartphone, Tag
 } from 'lucide-react';
 
 export default function PaymentCheckoutModal({ 
@@ -24,16 +24,50 @@ export default function PaymentCheckoutModal({
   const [error, setError] = useState('');
   const [submittedOrder, setSubmittedOrder] = useState(null);
 
+  // Dynamic config from backend
+  const [dynamicConfig, setDynamicConfig] = useState(null);
+
+  // Coupon Engine state
+  const [couponInput, setCouponInput] = useState('');
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
+
   const planName = selectedPlan?.name || 'Developer';
   const planId = selectedPlan?.id || 'developer';
   const billingCycle = selectedPlan?.billingCycle || 'monthly';
-
-  // Pricing matrix
   const isYearly = billingCycle === 'yearly';
   const isPro = planId === 'pro';
 
-  const bdtPrice = isPro ? (isYearly ? 4000 : 400) : (isYearly ? 1500 : 150);
-  const usdPrice = isPro ? (isYearly ? '32.00' : '3.20') : (isYearly ? '12.00' : '1.20');
+  // Load latest live pricing and gateway details on mount
+  useEffect(() => {
+    fetch('/api/v1/payment/config')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.config) {
+          setDynamicConfig(data.config);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Base pricing (dynamic or default)
+  const defaultBdt = isPro ? (isYearly ? 4000 : 400) : (isYearly ? 1500 : 150);
+  const defaultUsd = isPro ? (isYearly ? 32.00 : 3.20) : (isYearly ? 12.00 : 1.20);
+
+  const baseBdtPrice = dynamicConfig?.prices?.[planId]?.[billingCycle]?.bdt || defaultBdt;
+  const baseUsdPrice = dynamicConfig?.prices?.[planId]?.[billingCycle]?.usd || defaultUsd;
+
+  // Apply discount if coupon is active
+  const bdtPrice = appliedCoupon ? appliedCoupon.discounted_bdt : baseBdtPrice;
+  const usdPrice = appliedCoupon ? appliedCoupon.discounted_usd : (+baseUsdPrice).toFixed(2);
+
+  // Dynamic gateway details (fallbacks ensure zero downtime)
+  const bkashNumber = dynamicConfig?.gateways?.bkash?.number || '01939336831';
+  const rocketNumber = dynamicConfig?.gateways?.rocket?.number || '01939336831';
+  const nagadNumber = dynamicConfig?.gateways?.nagad?.number || '01925188754';
+  const binancePayId = dynamicConfig?.gateways?.binance_pay?.payId || '1025707697';
+  const trc20Address = dynamicConfig?.gateways?.trc20?.address || 'TFtpThLcVSbR6KKEExWg2UiWibUvFc1AG3';
 
   // Gateways configuration
   const gateways = {
@@ -42,16 +76,17 @@ export default function PaymentCheckoutModal({
       name: 'bKash',
       badge: 'Send Money',
       brandColor: '#e2136e',
-      recipient: '01939336831',
+      recipient: bkashNumber,
       recipientType: 'Personal',
       priceDisplay: `৳${bdtPrice} BDT`,
+      currency: 'BDT',
       senderLabel: 'Your bKash Mobile Number',
       senderPlaceholder: '01XXXXXXXXX',
       txIdLabel: 'bKash Transaction ID (TrxID)',
       txIdPlaceholder: 'e.g. BLA76GH12',
       instructions: [
         'bKash অ্যাপ ওপেন করুন অথবা *247# ডায়াল করুন।',
-        'Send Money অপশনে গিয়ে প্রাপক নম্বরে দিন: 01939336831 (Personal)',
+        `Send Money অপশনে গিয়ে প্রাপক নম্বরে দিন: ${bkashNumber} (Personal)`,
         `অ্যামাউন্ট দিন ঠিক: ৳${bdtPrice} টাকা।`,
         'ট্রানজেকশন সফল হওয়ার পর SMS বা অ্যাপ থেকে TrxID কপি করে নিচে দিন।'
       ]
@@ -61,16 +96,17 @@ export default function PaymentCheckoutModal({
       name: 'Rocket',
       badge: 'Send Money',
       brandColor: '#8c3494',
-      recipient: '01939336831',
+      recipient: rocketNumber,
       recipientType: 'Personal',
       priceDisplay: `৳${bdtPrice} BDT`,
+      currency: 'BDT',
       senderLabel: 'Your Rocket Mobile Number',
       senderPlaceholder: '01XXXXXXXXX',
       txIdLabel: 'Rocket Transaction ID (TrxID)',
       txIdPlaceholder: 'e.g. 9H5J76KD8',
       instructions: [
         'Rocket অ্যাপ ওপেন করুন অথবা *322# ডায়াল করুন।',
-        'Send Money সিলেক্ট করে নম্বর দিন: 01939336831 (Personal)',
+        `Send Money সিলেক্ট করে নম্বর দিন: ${rocketNumber} (Personal)`,
         `সঠিক অ্যামাউন্ট দিন: ৳${bdtPrice} টাকা।`,
         'ট্রানজেকশন সফল হলে ফিরতি মেসেজের TrxID কপি করে নিচে পেস্ট করুন।'
       ]
@@ -80,16 +116,17 @@ export default function PaymentCheckoutModal({
       name: 'Nagad',
       badge: 'Send Money',
       brandColor: '#f7941d',
-      recipient: '01925188754',
+      recipient: nagadNumber,
       recipientType: 'Personal',
       priceDisplay: `৳${bdtPrice} BDT`,
+      currency: 'BDT',
       senderLabel: 'Your Nagad Mobile Number',
       senderPlaceholder: '01XXXXXXXXX',
       txIdLabel: 'Nagad Transaction ID (TrxID)',
       txIdPlaceholder: 'e.g. 78GH92FA',
       instructions: [
         'Nagad অ্যাপ অথবা *167# এ প্রবেশ করুন।',
-        'Send Money অপশনে গিয়ে নম্বর দিন: 01925188754 (Personal)',
+        `Send Money অপশনে গিয়ে নম্বর দিন: ${nagadNumber} (Personal)`,
         `সঠিক অ্যামাউন্ট দিন: ৳${bdtPrice} টাকা।`,
         'সেন্ড মানি সম্পন্ন হলে ৮ সংখ্যার TrxID নিচে লিখুন।'
       ]
@@ -99,16 +136,17 @@ export default function PaymentCheckoutModal({
       name: 'Binance Pay',
       badge: '0 Fee',
       brandColor: '#f59e0b',
-      recipient: '1025707697',
+      recipient: binancePayId,
       recipientType: 'Binance Pay ID',
       priceDisplay: `$${usdPrice} USDT`,
+      currency: 'USDT',
       senderLabel: 'Your Binance Pay ID / Nickname / Email',
       senderPlaceholder: 'e.g. 987654321 or your@email.com',
       txIdLabel: 'Binance Pay Order ID / Transaction ID',
       txIdPlaceholder: 'e.g. 238910293810293',
       instructions: [
         'Open Binance App on your phone and tap Pay.',
-        'Tap Send > Enter Binance Pay ID: 1025707697',
+        `Tap Send > Enter Binance Pay ID: ${binancePayId}`,
         `Enter exact amount: $${usdPrice} USDT and confirm transfer (0 transaction fee).`,
         'Copy the Order ID / Pay ID from transaction details and paste below.'
       ]
@@ -118,16 +156,17 @@ export default function PaymentCheckoutModal({
       name: 'TRON (TRC20)',
       badge: 'USDT / TRX',
       brandColor: '#06b6d4',
-      recipient: 'TFtpThLcVSbR6KKEExWg2UiWibUvFc1AG3',
+      recipient: trc20Address,
       recipientType: 'TRON TRC20 Wallet',
       priceDisplay: `$${usdPrice} USDT`,
+      currency: 'USDT',
       senderLabel: 'Your Sender Wallet Address',
       senderPlaceholder: 'e.g. T...',
       txIdLabel: 'Blockchain Transaction Hash (TxID)',
       txIdPlaceholder: '64-character transaction hash...',
       instructions: [
         'Send USDT (TRC-20) or TRX from Binance, Trust Wallet, TronLink, or any Web3 wallet.',
-        'Recipient Address: TFtpThLcVSbR6KKEExWg2UiWibUvFc1AG3',
+        `Recipient Address: ${trc20Address}`,
         `Send: $${usdPrice} USDT (or equivalent TRX).`,
         'Once confirmed on TronScan, copy the 64-char TxID and paste below.'
       ]
@@ -140,6 +179,42 @@ export default function PaymentCheckoutModal({
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleApplyCoupon = async (e) => {
+    if (e) e.preventDefault();
+    if (!couponInput.trim()) return;
+    setCouponError('');
+    setValidatingCoupon(true);
+    try {
+      const res = await fetch('/api/v1/payment/validate-coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: couponInput.trim(),
+          plan: planId,
+          billing_cycle: billingCycle
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.valid) {
+        setAppliedCoupon(data);
+        setCouponError('');
+      } else {
+        setAppliedCoupon(null);
+        setCouponError(data.message || 'Invalid or expired coupon code.');
+      }
+    } catch (err) {
+      setCouponError('Network error validating coupon.');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
   };
 
   const handleSubmitOrder = async (e) => {
@@ -176,7 +251,8 @@ export default function PaymentCheckoutModal({
           billing_cycle: billingCycle,
           payment_method: activeTab,
           sender_number: senderNumber.trim(),
-          txid: txId.trim()
+          txid: txId.trim(),
+          coupon_code: appliedCoupon ? appliedCoupon.code : undefined
         })
       });
 
@@ -316,8 +392,18 @@ export default function PaymentCheckoutModal({
                 <span style={{ color: '#64748b' }}>Method:</span>
                 <span style={{ color: '#fff', fontWeight: 700 }}>{currentGateway.name}</span>
               </div>
+
+              {submittedOrder.coupon_code && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: '#10b981' }}>Applied Coupon:</span>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>
+                    {submittedOrder.coupon_code} ({submittedOrder.discount_percent}% OFF)
+                  </span>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#64748b' }}>Amount:</span>
+                <span style={{ color: '#64748b' }}>Amount Paid:</span>
                 <span style={{ color: '#10b981', fontWeight: 800 }}>
                   {submittedOrder.currency === 'BDT' ? `৳${submittedOrder.amount}` : `$${submittedOrder.amount}`} {submittedOrder.currency}
                 </span>
@@ -391,7 +477,7 @@ export default function PaymentCheckoutModal({
                 </h2>
               </div>
               <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: 0 }}>
-                Instant deposit • Zero KYC • 5 Payment Methods Available
+                Instant deposit • Zero KYC • 5 Payment Gateways • Promo Code Supported
               </p>
             </div>
 
@@ -437,7 +523,7 @@ export default function PaymentCheckoutModal({
               </div>
             ) : (
               <>
-                {/* Plan Summary Banner */}
+                {/* Plan Summary Banner with Dynamic Pricing & Strikethrough Discount */}
                 <div style={{
                   background: 'rgba(255, 255, 255, 0.04)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -446,7 +532,7 @@ export default function PaymentCheckoutModal({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: '16px'
+                  marginBottom: '14px'
                 }}>
                   <div>
                     <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8' }}>
@@ -457,13 +543,130 @@ export default function PaymentCheckoutModal({
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '20px', fontWeight: 900, color: '#10b981' }}>
-                      {currentGateway.priceDisplay}
-                    </span>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>
-                      {currentGateway.currency === 'BDT' ? `≈ $${usdPrice} USD` : `≈ ৳${bdtPrice} BDT`}
-                    </div>
+                    {appliedCoupon ? (
+                      <div>
+                        <span style={{
+                          fontSize: '13px',
+                          color: '#94a3b8',
+                          textDecoration: 'line-through',
+                          marginRight: '8px'
+                        }}>
+                          {currentGateway.currency === 'BDT' ? `৳${baseBdtPrice}` : `$${baseUsdPrice}`}
+                        </span>
+                        <span style={{ fontSize: '20px', fontWeight: 900, color: '#10b981' }}>
+                          {currentGateway.priceDisplay}
+                        </span>
+                        <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 800 }}>
+                          🔥 {appliedCoupon.discount_percent}% DISCOUNT APPLIED
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <span style={{ fontSize: '20px', fontWeight: 900, color: '#10b981' }}>
+                          {currentGateway.priceDisplay}
+                        </span>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>
+                          {currentGateway.currency === 'BDT' ? `≈ $${usdPrice} USD` : `≈ ৳${bdtPrice} BDT`}
+                        </div>
+                      </div>
+                    )}
                   </div>
+                </div>
+
+                {/* PROMO / COUPON CODE BOX */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '14px',
+                  padding: '12px 14px',
+                  marginBottom: '16px'
+                }}>
+                  {appliedCoupon ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Tag size={16} color="#10b981" />
+                        <div>
+                          <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#10b981' }}>
+                            Coupon Applied: {appliedCoupon.code}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>
+                            ({appliedCoupon.discount_percent}% OFF)
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          color: '#f87171',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                          <Tag size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                          <input
+                            type="text"
+                            value={couponInput}
+                            onChange={(e) => {
+                              setCouponInput(e.target.value.toUpperCase());
+                              setCouponError('');
+                            }}
+                            placeholder="Promo / Coupon Code (e.g. SUMMER50)"
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px 8px 32px',
+                              background: 'rgba(0, 0, 0, 0.3)',
+                              border: '1px solid rgba(255, 255, 255, 0.12)',
+                              borderRadius: '8px',
+                              color: '#ffffff',
+                              fontSize: '12px',
+                              textTransform: 'uppercase',
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleApplyCoupon}
+                          disabled={validatingCoupon || !couponInput.trim()}
+                          style={{
+                            padding: '8px 16px',
+                            background: validatingCoupon || !couponInput.trim() ? 'rgba(255, 255, 255, 0.08)' : '#2563eb',
+                            color: validatingCoupon || !couponInput.trim() ? '#64748b' : '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: validatingCoupon || !couponInput.trim() ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          {validatingCoupon ? <RefreshCw size={13} className="spinner-loader" /> : <Sparkles size={13} />}
+                          <span>Apply</span>
+                        </button>
+                      </div>
+                      {couponError && (
+                        <div style={{ fontSize: '11px', color: '#f87171', marginTop: '6px' }}>
+                          {couponError}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* 5-GATEWAY TAB SELECTOR */}
@@ -475,7 +678,7 @@ export default function PaymentCheckoutModal({
                   padding: '5px',
                   borderRadius: '14px',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
-                  marginBottom: '18px'
+                  marginBottom: '16px'
                 }}>
                   {Object.values(gateways).map((gw) => {
                     const isSelected = activeTab === gw.id;
@@ -516,7 +719,7 @@ export default function PaymentCheckoutModal({
                   border: `1px solid ${currentGateway.brandColor}33`,
                   borderRadius: '16px',
                   padding: '16px',
-                  marginBottom: '18px'
+                  marginBottom: '16px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
@@ -698,7 +901,7 @@ export default function PaymentCheckoutModal({
                       onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)'}
                     />
                     <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                      Anti-fraud protected: Every TrxID is uniquely verified. Multi-account claiming is strictly blocked.
+                      Anti-fraud protected: Every TrxID is uniquely verified. Multi-account reuse is strictly blocked.
                     </div>
                   </div>
 

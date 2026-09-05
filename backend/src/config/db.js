@@ -286,6 +286,31 @@ export function initDatabase() {
       FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
     );
 
+    -- 20. Coupons & Promo Engine
+    CREATE TABLE IF NOT EXISTS coupons (
+      id TEXT PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      discount_percent INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL, -- Unix timestamp in seconds (0 = never)
+      duration_seconds INTEGER DEFAULT 0,
+      max_uses INTEGER DEFAULT 0, -- 0 = unlimited
+      used_count INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_by TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS coupon_redemptions (
+      id TEXT PRIMARY KEY,
+      coupon_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      order_id TEXT,
+      discount_percent INTEGER NOT NULL,
+      redeemed_at INTEGER NOT NULL,
+      FOREIGN KEY (coupon_id) REFERENCES coupons(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES accounts(id) ON DELETE CASCADE
+    );
+
     -- Performance Indexes
     CREATE INDEX IF NOT EXISTS idx_accounts_discord ON accounts(discord_id);
     CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_id);
@@ -299,6 +324,8 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_blacklists_lookup ON blacklists(type, value);
     CREATE INDEX IF NOT EXISTS idx_crypto_payments_txid ON crypto_payments(txid);
     CREATE INDEX IF NOT EXISTS idx_crypto_payments_user ON crypto_payments(user_id);
+    CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
+    CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_user ON coupon_redemptions(user_id);
   `);
 
   // Auto-migrate new columns if existing SQLite DB was already created
@@ -338,6 +365,9 @@ export function initDatabase() {
   try { db.exec("ALTER TABLE crypto_payments ADD COLUMN admin_notes TEXT DEFAULT '';"); } catch (e) {}
   try { db.exec("ALTER TABLE crypto_payments ADD COLUMN reviewed_at INTEGER DEFAULT 0;"); } catch (e) {}
   try { db.exec("ALTER TABLE crypto_payments ADD COLUMN reviewed_by TEXT DEFAULT '';"); } catch (e) {}
+  try { db.exec("ALTER TABLE crypto_payments ADD COLUMN coupon_code TEXT DEFAULT '';"); } catch (e) {}
+  try { db.exec("ALTER TABLE crypto_payments ADD COLUMN discount_percent INTEGER DEFAULT 0;"); } catch (e) {}
+  try { db.exec("ALTER TABLE crypto_payments ADD COLUMN original_amount REAL DEFAULT 0;"); } catch (e) {}
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_crypto_payments_status ON crypto_payments(status);"); } catch (e) {}
 
   // Auto-sync team capacity to 500 for Pro and Admin accounts

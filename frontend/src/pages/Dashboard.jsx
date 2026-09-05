@@ -211,6 +211,195 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
     }
   };
 
+
+  // ── COUPON CODE SYSTEM (ADMIN) ──
+  const [adminCoupons, setAdminCoupons] = useState([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [newCouponCode, setNewCouponCode] = useState('');
+  const [newCouponDiscount, setNewCouponDiscount] = useState(20);
+  const [newCouponDurationVal, setNewCouponDurationVal] = useState(1);
+  const [newCouponDurationUnit, setNewCouponDurationUnit] = useState('days'); // 'seconds' | 'minutes' | 'hours' | 'days' | 'months' | 'unlimited'
+  const [newCouponMaxUses, setNewCouponMaxUses] = useState(0); // 0 = unlimited
+  const [creatingCoupon, setCreatingCoupon] = useState(false);
+
+  // ── DYNAMIC PAYMENT SETTINGS (ADMIN) ──
+  const [paymentSettings, setPaymentSettings] = useState({
+    price_dev_monthly_usd: 1.20,
+    price_dev_monthly_bdt: 150,
+    price_dev_yearly_usd: 12.00,
+    price_dev_yearly_bdt: 1500,
+    price_pro_monthly_usd: 3.20,
+    price_pro_monthly_bdt: 400,
+    price_pro_yearly_usd: 32.00,
+    price_pro_yearly_bdt: 4000,
+    bkash_number: '01939336831',
+    rocket_number: '01939336831',
+    nagad_number: '01925188754',
+    binance_pay_id: '1025707697',
+    trc20_address: 'TFtpThLcVSbR6KKEExWg2UiWibUvFc1AG3',
+    discord_webhook_url: ''
+  });
+  const [loadingPaymentSettings, setLoadingPaymentSettings] = useState(false);
+  const [savingPaymentSettings, setSavingPaymentSettings] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+
+  const fetchAdminCoupons = async () => {
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    setLoadingCoupons(true);
+    try {
+      const res = await fetch('/api/v1/admin/coupons', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminCoupons(data.coupons || []);
+      }
+    } catch (e) {
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
+
+  const handleCreateCoupon = async (e) => {
+    if (e) e.preventDefault();
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    if (!newCouponCode.trim()) {
+      showToast('Please enter a coupon code.', 'error');
+      return;
+    }
+    setCreatingCoupon(true);
+    try {
+      const res = await fetch('/api/v1/admin/coupons', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          code: newCouponCode.trim().toUpperCase(),
+          discount_percent: Number(newCouponDiscount),
+          duration_value: newCouponDurationUnit === 'unlimited' ? 0 : Number(newCouponDurationVal),
+          duration_unit: newCouponDurationUnit,
+          max_uses: Number(newCouponMaxUses)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'Coupon created successfully!', 'success');
+        setNewCouponCode('');
+        fetchAdminCoupons();
+      } else {
+        showToast(data.message || 'Failed to create coupon.', 'error');
+      }
+    } catch (err) {
+      showToast('Error creating coupon: ' + err.message, 'error');
+    } finally {
+      setCreatingCoupon(false);
+    }
+  };
+
+  const handleDeleteCoupon = async (couponId, code) => {
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    promptConfirm({
+      title: 'Delete Coupon',
+      message: `Are you sure you want to permanently delete coupon "${code}"?`,
+      confirmText: 'Delete',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/admin/coupons/${couponId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast('Coupon deleted successfully.', 'success');
+            fetchAdminCoupons();
+          } else {
+            showToast(data.message || 'Failed to delete coupon.', 'error');
+          }
+        } catch (err) {
+          showToast('Error deleting coupon.', 'error');
+        }
+      }
+    });
+  };
+
+  const fetchPaymentSettings = async () => {
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    setLoadingPaymentSettings(true);
+    try {
+      const res = await fetch('/api/v1/admin/payment-settings', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.settings) {
+        setPaymentSettings(data.settings);
+      }
+    } catch (e) {
+    } finally {
+      setLoadingPaymentSettings(false);
+    }
+  };
+
+  const handleSavePaymentSettings = async (e) => {
+    if (e) e.preventDefault();
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    setSavingPaymentSettings(true);
+    try {
+      const res = await fetch('/api/v1/admin/payment-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(paymentSettings)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'Payment settings updated successfully!', 'success');
+        fetchPaymentSettings();
+      } else {
+        showToast(data.message || 'Failed to update settings.', 'error');
+      }
+    } catch (err) {
+      showToast('Error saving settings: ' + err.message, 'error');
+    } finally {
+      setSavingPaymentSettings(false);
+    }
+  };
+
+  const handleTestDiscordWebhook = async () => {
+    const token = localStorage.getItem('habit_token');
+    if (!token) return;
+    setTestingWebhook(true);
+    try {
+      const res = await fetch('/api/v1/admin/test-webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ webhook_url: paymentSettings.discord_webhook_url })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'Discord test ping sent successfully!', 'success');
+      } else {
+        showToast(data.message || 'Failed to send test ping.', 'error');
+      }
+    } catch (err) {
+      showToast('Error contacting Discord: ' + err.message, 'error');
+    } finally {
+      setTestingWebhook(false);
+    }
+  };
+
   const fetchAdminOrders = async () => {
     const token = localStorage.getItem('habit_token');
     if (!token) return;
@@ -284,6 +473,8 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
     }
     if (activeNav === 'admin') {
       fetchAdminOrders();
+      if (adminSubTab === 'coupons') fetchAdminCoupons();
+      if (adminSubTab === 'billing') fetchPaymentSettings();
     }
   }, [activeNav]);
 
@@ -8461,6 +8652,39 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                 <Code size={13} /> Settings → SDK
               </button>
               <button 
+                onClick={() => { setAdminSubTab('orders'); fetchAdminOrders(); }} 
+                className={`btn ${adminSubTab === 'orders' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <CreditCard size={13} /> Payment Orders ({adminOrders.length})
+                {adminOrders.filter(o => o.status === 'pending').length > 0 && (
+                  <span style={{
+                    background: '#ef4444',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    fontSize: '10px',
+                    padding: '1px 6px',
+                    fontWeight: 900
+                  }}>
+                    {adminOrders.filter(o => o.status === 'pending').length}
+                  </span>
+                )}
+              </button>
+              <button 
+                onClick={() => { setAdminSubTab('coupons'); fetchAdminCoupons(); }} 
+                className={`btn ${adminSubTab === 'coupons' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Zap size={13} color="#f59e0b" /> Coupons ({adminCoupons.length})
+              </button>
+              <button 
+                onClick={() => { setAdminSubTab('billing'); fetchPaymentSettings(); }} 
+                className={`btn ${adminSubTab === 'billing' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Sliders size={13} color="#38bdf8" /> Billing & Settings
+              </button>
+              <button 
                 onClick={() => { setAdminSubTab('database'); fetchDatabaseStats(); }} 
                 className={`btn ${adminSubTab === 'database' ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ padding: '8px 16px', fontSize: '12.5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -10140,6 +10364,599 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               </div>
             )}
 
+
+
+            {/* ── 9. ADMIN COUPONS MANAGEMENT SUB-TAB ── */}
+            {adminSubTab === 'coupons' && (
+              <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* Header info bar */}
+                <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Zap size={20} color="#f59e0b" /> Promo & Discount Coupons
+                    </h3>
+                    <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Create custom coupon codes with percentage discounts (1-100%), custom expiration timers (1 second up to 1 month), and usage limits.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchAdminCoupons}
+                    disabled={loadingCoupons}
+                    className="btn btn-secondary"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+                  >
+                    <RefreshCw size={13} className={loadingCoupons ? 'spinner-loader' : ''} />
+                    <span>Refresh Coupons</span>
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', alignItems: 'start' }}>
+                  {/* Create Coupon Card */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#f59e0b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Plus size={16} /> Create New Coupon
+                    </h4>
+
+                    <form onSubmit={handleCreateCoupon} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* Code Name */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                          Coupon Code
+                        </label>
+                        <input
+                          type="text"
+                          value={newCouponCode}
+                          onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. FLASH50, RAMADAN, WELCOME"
+                          className="form-input"
+                          style={{ width: '100%', fontFamily: 'var(--font-mono)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}
+                          required
+                        />
+                      </div>
+
+                      {/* Discount % */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <label style={{ fontSize: '12px', fontWeight: 700, color: '#cbd5e1' }}>
+                            Discount Percentage
+                          </label>
+                          <span style={{ fontSize: '13px', fontWeight: 900, color: '#10b981' }}>
+                            {newCouponDiscount}% OFF
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="100"
+                          value={newCouponDiscount}
+                          onChange={(e) => setNewCouponDiscount(Number(e.target.value))}
+                          style={{ width: '100%', accentColor: '#10b981', cursor: 'pointer' }}
+                        />
+                        {/* Quick % buttons */}
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                          {[10, 20, 30, 50, 75, 100].map(pct => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => setNewCouponDiscount(pct)}
+                              style={{
+                                flex: 1, padding: '4px 0', fontSize: '11px', fontWeight: 700, borderRadius: '6px',
+                                background: newCouponDiscount === pct ? '#10b981' : 'rgba(255, 255, 255, 0.06)',
+                                color: newCouponDiscount === pct ? '#fff' : '#94a3b8',
+                                border: 'none', cursor: 'pointer'
+                              }}
+                            >
+                              {pct}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Expiration Timer */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                          Expiration Timer (1s to 1 Month)
+                        </label>
+                        
+                        {/* Quick Presets */}
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                          {[
+                            { label: '⚡ 30s Flash', val: 30, unit: 'seconds' },
+                            { label: '⏳ 10m', val: 10, unit: 'minutes' },
+                            { label: '🕒 1 Hour', val: 1, unit: 'hours' },
+                            { label: '📅 1 Day', val: 1, unit: 'days' },
+                            { label: '🚀 7 Days', val: 7, unit: 'days' },
+                            { label: '🗓️ 1 Month', val: 1, unit: 'months' },
+                            { label: '♾️ Unlimited', val: 0, unit: 'unlimited' }
+                          ].map((p, idx) => {
+                            const isSelected = newCouponDurationUnit === p.unit && (p.unit === 'unlimited' || newCouponDurationVal === p.val);
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  setNewCouponDurationVal(p.val);
+                                  setNewCouponDurationUnit(p.unit);
+                                }}
+                                style={{
+                                  padding: '4px 10px', fontSize: '11px', fontWeight: 700, borderRadius: '8px',
+                                  background: isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.05)',
+                                  color: isSelected ? '#fff' : '#94a3b8',
+                                  border: isSelected ? '1px solid #60a5fa' : '1px solid rgba(255, 255, 255, 0.08)',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {p.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {newCouponDurationUnit !== 'unlimited' && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                              type="number"
+                              min="1"
+                              value={newCouponDurationVal}
+                              onChange={(e) => setNewCouponDurationVal(Math.max(1, parseInt(e.target.value || '1', 10)))}
+                              className="form-input"
+                              style={{ flex: 1 }}
+                            />
+                            <select
+                              value={newCouponDurationUnit}
+                              onChange={(e) => setNewCouponDurationUnit(e.target.value)}
+                              className="form-input"
+                              style={{ flex: 1 }}
+                            >
+                              <option value="seconds">Seconds</option>
+                              <option value="minutes">Minutes</option>
+                              <option value="hours">Hours</option>
+                              <option value="days">Days</option>
+                              <option value="months">Months (30d)</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Max Uses */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                          Maximum Redemptions (0 = Unlimited)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={newCouponMaxUses}
+                          onChange={(e) => setNewCouponMaxUses(Math.max(0, parseInt(e.target.value || '0', 10)))}
+                          className="form-input"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={creatingCoupon}
+                        className="btn btn-primary"
+                        style={{
+                          width: '100%', padding: '12px', fontSize: '13px', fontWeight: 800,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                          marginTop: '8px'
+                        }}
+                      >
+                        {creatingCoupon ? <RefreshCw size={14} className="spinner-loader" /> : <Plus size={15} />}
+                        <span>Create & Activate Coupon</span>
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Coupons Table Card */}
+                  <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 800, fontSize: '14px', color: '#fff' }}>Existing Coupons ({adminCoupons.length})</span>
+                      <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Auto-invalidates when timer reaches 0</span>
+                    </div>
+
+                    <div className="table-responsive">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Code</th>
+                            <th>Discount</th>
+                            <th>Timer / Expires</th>
+                            <th>Uses</th>
+                            <th>Status</th>
+                            <th style={{ textAlign: 'right' }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {adminCoupons.map((cpn) => {
+                            const now = Math.floor(Date.now() / 1000);
+                            const isExpired = cpn.expires_at && cpn.expires_at < now;
+                            const isMaxed = cpn.max_uses > 0 && cpn.used_count >= cpn.max_uses;
+                            const diffSec = cpn.expires_at ? Math.max(0, cpn.expires_at - now) : null;
+
+                            let timerDisplay = '♾️ Unlimited';
+                            if (cpn.expires_at) {
+                              if (diffSec <= 0) {
+                                timerDisplay = 'EXPIRED';
+                              } else if (diffSec < 60) {
+                                timerDisplay = `${diffSec}s left`;
+                              } else if (diffSec < 3600) {
+                                timerDisplay = `${Math.floor(diffSec / 60)}m ${diffSec % 60}s left`;
+                              } else if (diffSec < 86400) {
+                                timerDisplay = `${Math.floor(diffSec / 3600)}h ${Math.floor((diffSec % 3600) / 60)}m left`;
+                              } else {
+                                timerDisplay = `${Math.floor(diffSec / 86400)}d ${Math.floor((diffSec % 86400) / 3600)}h left`;
+                              }
+                            }
+
+                            return (
+                              <tr key={cpn.id} style={{ opacity: isExpired || isMaxed ? 0.6 : 1 }}>
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{
+                                      fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '12.5px',
+                                      color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)',
+                                      padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.5px'
+                                    }}>
+                                      {cpn.code}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(cpn.code, cpn.id)}
+                                      style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}
+                                      title="Copy Code"
+                                    >
+                                      {copiedKey === cpn.id ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                                    </button>
+                                  </div>
+                                </td>
+                                <td>
+                                  <span style={{ fontWeight: 800, color: '#10b981', fontSize: '13px' }}>
+                                    {cpn.discount_percent}% OFF
+                                  </span>
+                                </td>
+                                <td>
+                                  <span style={{
+                                    fontSize: '11.5px',
+                                    fontWeight: 700,
+                                    color: isExpired ? '#f87171' : '#38bdf8'
+                                  }}>
+                                    {timerDisplay}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span style={{ fontSize: '11.5px', color: '#cbd5e1' }}>
+                                    {cpn.used_count} / {cpn.max_uses === 0 ? '∞' : cpn.max_uses}
+                                  </span>
+                                </td>
+                                <td>
+                                  {isExpired ? (
+                                    <span className="badge badge-danger" style={{ fontSize: '10px' }}>EXPIRED</span>
+                                  ) : isMaxed ? (
+                                    <span className="badge badge-warning" style={{ fontSize: '10px' }}>MAX USES</span>
+                                  ) : (
+                                    <span className="badge badge-success" style={{ fontSize: '10px' }}>ACTIVE</span>
+                                  )}
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCoupon(cpn.id, cpn.code)}
+                                    className="btn btn-secondary"
+                                    style={{ padding: '4px 8px', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                    title="Delete Coupon"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                          {adminCoupons.length === 0 && (
+                            <tr>
+                              <td colSpan="6" style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--text-muted)' }}>
+                                No coupons created yet. Create a coupon using the form on the left.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ── 10. ADMIN DYNAMIC BILLING & GATEWAY SETTINGS SUB-TAB ── */}
+            {adminSubTab === 'billing' && (
+              <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* Header bar */}
+                <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Sliders size={20} color="#38bdf8" /> Dynamic Pricing & Payment Settings
+                    </h3>
+                    <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Update subscription plan prices, mobile banking numbers, crypto wallets, and Discord webhook notifications without touching code.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={fetchPaymentSettings}
+                      disabled={loadingPaymentSettings}
+                      className="btn btn-secondary"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+                    >
+                      <RefreshCw size={13} className={loadingPaymentSettings ? 'spinner-loader' : ''} />
+                      <span>Reload</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSavePaymentSettings}
+                      disabled={savingPaymentSettings}
+                      className="btn btn-primary"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 800 }}
+                    >
+                      {savingPaymentSettings ? <RefreshCw size={13} className="spinner-loader" /> : <Check size={13} />}
+                      <span>Save All Changes</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+                  
+                  {/* Card 1: Subscription Prices */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#38bdf8', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CreditCard size={16} /> Subscription Prices (USD & BDT)
+                    </h4>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* Developer Plan */}
+                      <div style={{ padding: '14px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.07)' }}>
+                        <div style={{ fontWeight: 800, fontSize: '13px', color: '#93c5fd', marginBottom: '12px' }}>
+                          DEVELOPER PLAN
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Monthly USD ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={paymentSettings.price_dev_monthly_usd}
+                              onChange={(e) => setPaymentSettings({ ...paymentSettings, price_dev_monthly_usd: e.target.value })}
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Monthly BDT (৳)</label>
+                            <input
+                              type="number"
+                              value={paymentSettings.price_dev_monthly_bdt}
+                              onChange={(e) => setPaymentSettings({ ...paymentSettings, price_dev_monthly_bdt: e.target.value })}
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Yearly USD ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={paymentSettings.price_dev_yearly_usd}
+                              onChange={(e) => setPaymentSettings({ ...paymentSettings, price_dev_yearly_usd: e.target.value })}
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Yearly BDT (৳)</label>
+                            <input
+                              type="number"
+                              value={paymentSettings.price_dev_yearly_bdt}
+                              onChange={(e) => setPaymentSettings({ ...paymentSettings, price_dev_yearly_bdt: e.target.value })}
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pro Developer Plan */}
+                      <div style={{ padding: '14px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.07)' }}>
+                        <div style={{ fontWeight: 800, fontSize: '13px', color: '#f59e0b', marginBottom: '12px' }}>
+                          PRO DEVELOPER PLAN
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Monthly USD ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={paymentSettings.price_pro_monthly_usd}
+                              onChange={(e) => setPaymentSettings({ ...paymentSettings, price_pro_monthly_usd: e.target.value })}
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Monthly BDT (৳)</label>
+                            <input
+                              type="number"
+                              value={paymentSettings.price_pro_monthly_bdt}
+                              onChange={(e) => setPaymentSettings({ ...paymentSettings, price_pro_monthly_bdt: e.target.value })}
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Yearly USD ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={paymentSettings.price_pro_yearly_usd}
+                              onChange={(e) => setPaymentSettings({ ...paymentSettings, price_pro_yearly_usd: e.target.value })}
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Yearly BDT (৳)</label>
+                            <input
+                              type="number"
+                              value={paymentSettings.price_pro_yearly_bdt}
+                              onChange={(e) => setPaymentSettings({ ...paymentSettings, price_pro_yearly_bdt: e.target.value })}
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Card 2: Gateways & Numbers */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#10b981', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Smartphone size={16} /> Gateway Numbers & Wallets
+                    </h4>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: 700, color: '#e2136e', display: 'block', marginBottom: '4px' }}>
+                          bKash Personal Number
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentSettings.bkash_number || ''}
+                          onChange={(e) => setPaymentSettings({ ...paymentSettings, bkash_number: e.target.value })}
+                          placeholder="e.g. 01939336831"
+                          className="form-input"
+                          style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: 700, color: '#c084fc', display: 'block', marginBottom: '4px' }}>
+                          Rocket Personal Number
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentSettings.rocket_number || ''}
+                          onChange={(e) => setPaymentSettings({ ...paymentSettings, rocket_number: e.target.value })}
+                          placeholder="e.g. 01939336831"
+                          className="form-input"
+                          style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: 700, color: '#f97316', display: 'block', marginBottom: '4px' }}>
+                          Nagad Personal Number
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentSettings.nagad_number || ''}
+                          onChange={(e) => setPaymentSettings({ ...paymentSettings, nagad_number: e.target.value })}
+                          placeholder="e.g. 01925188754"
+                          className="form-input"
+                          style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', display: 'block', marginBottom: '4px' }}>
+                          Binance Pay ID (0 Fee)
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentSettings.binance_pay_id || ''}
+                          onChange={(e) => setPaymentSettings({ ...paymentSettings, binance_pay_id: e.target.value })}
+                          placeholder="e.g. 1025707697"
+                          className="form-input"
+                          style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: 700, color: '#06b6d4', display: 'block', marginBottom: '4px' }}>
+                          TRON (TRC-20) USDT / TRX Address
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentSettings.trc20_address || ''}
+                          onChange={(e) => setPaymentSettings({ ...paymentSettings, trc20_address: e.target.value })}
+                          placeholder="e.g. TFtpThLcVSbR6KKEExWg2UiWibUvFc1AG3"
+                          className="form-input"
+                          style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Discord Notification Webhook */}
+                  <div className="glass-panel" style={{ padding: '24px', gridColumn: '1 / -1' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#818cf8', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <DiscordIcon size={18} color="#818cf8" /> Discord Payment Alerts Webhook
+                    </h4>
+
+                    <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5 }}>
+                      When a customer claims or submits a payment order, or when an admin reviews an order, real-time alert embeds are automatically posted to this Discord webhook channel.
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <input
+                        type="url"
+                        value={paymentSettings.discord_webhook_url || ''}
+                        onChange={(e) => setPaymentSettings({ ...paymentSettings, discord_webhook_url: e.target.value })}
+                        placeholder="https://discord.com/api/webhooks/..."
+                        className="form-input"
+                        style={{ flex: 1, minWidth: '280px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleTestDiscordWebhook}
+                        disabled={testingWebhook || !paymentSettings.discord_webhook_url}
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700 }}
+                      >
+                        {testingWebhook ? <RefreshCw size={13} className="spinner-loader" /> : <Send size={13} />}
+                        <span>Send Test Webhook</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSavePaymentSettings}
+                        disabled={savingPaymentSettings}
+                        className="btn btn-primary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 800 }}
+                      >
+                        {savingPaymentSettings ? <RefreshCw size={13} className="spinner-loader" /> : <Check size={13} />}
+                        <span>Save All Settings</span>
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
 
             {adminSubTab === 'database' && (
               <div className="animate-slide-up tab-animated-content">
