@@ -399,6 +399,25 @@ export function initDatabase() {
   insertSetting.run('discord_invite_url', 'https://discord.gg/7JX63q4Aa', now);
   insertSetting.run('github_url', 'https://github.com/YourOrganization/HabitAuth', now);
 
+  // Always ensure Master Owner Account exists in the database on any instance boot
+  try {
+    const owner = db.prepare("SELECT id FROM accounts WHERE discord_id = '1281266486601715834' OR username = 'meherab009'").get();
+    if (!owner) {
+      db.prepare(`
+        INSERT INTO accounts (id, discord_id, username, email, avatar, role, created_at, updated_at, status)
+        VALUES ('usr_c0049143710d4e5c', '1281266486601715834', 'meherab009', 'bappyxcheat@gmail.com', 'https://cdn.discordapp.com/avatars/1281266486601715834/d71403e45350fb26a3270b20df95e8df.png', 'admin', 1788558076, 1788558076, 'active')
+      `).run();
+
+      db.prepare(`
+        INSERT OR REPLACE INTO subscriptions (id, user_id, plan, status, started_at, expires_at, provider, created_at)
+        VALUES ('sub_b9bf6ca6-79d', 'usr_c0049143710d4e5c', 'developer', 'active', 1788558076, 0, 'discord', 1788558076)
+      `).run();
+      console.log('👑 Master Owner account (meherab009) initialized successfully.');
+    }
+  } catch (e) {
+    console.error('Owner seed error:', e);
+  }
+
   console.log('📦 Habit Auth Relational Database Initialized Successfully (node:sqlite native).');
 }
 

@@ -52,7 +52,11 @@ export default function App() {
   // Password reset token detection from query params or route
   const [resetToken, setResetToken] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('reset_token') || params.get('token') || (window.location.pathname.startsWith('/reset-password') ? params.get('token') : null);
+    if (params.get('reset_token')) return params.get('reset_token');
+    if (window.location.pathname.startsWith('/reset-password')) {
+      return params.get('token') || params.get('reset_token') || null;
+    }
+    return null;
   });
 
   const [bannedInfo, setBannedInfo] = useState({ isBanned: false, reason: '' });
@@ -88,7 +92,7 @@ export default function App() {
               const refreshed = { ...parsed, ...data.user };
               setUser(refreshed);
               localStorage.setItem('habit_user', JSON.stringify(refreshed));
-            } else if (data.code === 'ACCOUNT_BANNED' || data.message === 'Session has been revoked.' || data.message === 'Session expired or revoked.') {
+            } else if (data.message === 'User account not found.' || data.code === 'ACCOUNT_BANNED' || data.message === 'Session has been revoked.' || data.message === 'Session expired or revoked.') {
               localStorage.removeItem('habit_user');
               localStorage.removeItem('habit_token');
               setUser(null);

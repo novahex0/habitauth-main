@@ -12,11 +12,12 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
   const { t, language } = useLanguage();
   const [openFaq, setOpenFaq] = useState(null);
   const [heroImage, setHeroImage] = useState(() => {
-    return localStorage.getItem('habit_landing_hero_image') || '/uploads/notif_1788492876029_e25a3304.png';
+    const saved = localStorage.getItem('habit_landing_hero_image');
+    return saved && !saved.includes('notif_1788492876029_e25a3304') ? saved : null;
   });
   const [isHeroImageActive, setIsHeroImageActive] = useState(() => {
     const saved = localStorage.getItem('habit_landing_hero_image_active');
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
 
   // Fetch dynamic landing page hero image if configured by admin
@@ -285,6 +286,7 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
                   <img 
                     src={heroImage} 
                     alt="Habit Auth Dashboard Preview" 
+                    onError={() => setIsHeroImageActive(false)}
                     style={{
                       width: '100%',
                       height: 'auto',
