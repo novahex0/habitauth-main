@@ -7,6 +7,7 @@ import {
   Users, Server, Radio, BarChart3, Code2, Play, Eye
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext.jsx';
+import LanguageTicker from './LanguageTicker.jsx';
 
 export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }) {
   const { t, language } = useLanguage();
@@ -513,8 +514,11 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
 
         </div>
       </section>
+ 
+      {/* ── 2. INTEGRATE INTO ANY PROGRAMMING LANGUAGE (OBSIDIAN TICKER) ── */}
+      <LanguageTicker onNavigate={onNavigate} />
 
-      {/* ── 2. OBSIDIAN-STYLE 6-FEATURE GRID (SCROLL REVEAL) ─────────── */}
+      {/* ── 3. OBSIDIAN-STYLE 6-FEATURE GRID (SCROLL REVEAL) ─────────── */}
       <section className="obsidian-reveal" style={{ maxWidth: '1240px', margin: '0 auto', padding: '90px 24px 60px', textAlign: 'center' }}>
         
         {/* Section Header */}
