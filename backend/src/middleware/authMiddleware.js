@@ -20,15 +20,15 @@ export function authenticateUser(req, res, next) {
     const decoded = jwt.verify(token, getJwtSecret());
     
     // Check if session was explicitly revoked
-    const existingSession = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
-    if (existingSession && existingSession.is_revoked) {
+    let currentSession = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+    if (currentSession && currentSession.is_revoked) {
       return res.status(401).json({ success: false, message: 'Session has been revoked.' });
     }
 
     const now = Math.floor(Date.now() / 1000);
 
     // If session row is missing (e.g. wiped during database cleanup or server reboot), rehydrate it
-    if (!existingSession) {
+    if (!currentSession) {
       const sessionId = 'ses_' + (decoded.sessionKey ? String(decoded.sessionKey).slice(0, 12) : Math.random().toString(36).substring(2, 12));
       const userAgent = req.headers['user-agent'] || 'Unknown Browser';
       const ip = req.ip || req.connection?.remoteAddress || '127.0.0.1';
@@ -37,12 +37,13 @@ export function authenticateUser(req, res, next) {
           INSERT OR REPLACE INTO sessions (id, user_id, token, ip_address, user_agent, created_at, last_active, is_revoked)
           VALUES (?, ?, ?, ?, ?, ?, ?, 0)
         `).run(sessionId, decoded.userId, token, ip, userAgent, now, now);
+        currentSession = { id: sessionId, user_id: decoded.userId, token, ip_address: ip, user_agent: userAgent, created_at: now, last_active: now, is_revoked: 0 };
       } catch (e) {
-        // Ignore duplicate insert race condition
+        currentSession = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
       }
     } else {
       // Update last_active
-      db.prepare('UPDATE sessions SET last_active = ? WHERE id = ?').run(now, existingSession.id);
+      db.prepare('UPDATE sessions SET last_active = ? WHERE id = ?').run(now, currentSession.id);
     }
 
     // Fetch user account & subscription
@@ -75,9 +76,10 @@ export function authenticateUser(req, res, next) {
     }
 
     req.user = user;
-    req.session = session;
+    req.session = currentSession || { id: 'ses_active', user_id: user.id, token };
     next();
   } catch (err) {
+    console.error('[AUTH ERROR in authenticateUser]:', err);
     return res.status(401).json({ success: false, message: 'Invalid or expired authentication token.' });
   }
 }

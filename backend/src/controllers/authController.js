@@ -4,12 +4,11 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { recordAuditLog, sendInAppNotification } from '../middleware/helpers.js';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'habit_auth_super_secret_jwt_key_2026_billion_scale';
+import { getJwtSecret } from '../middleware/authMiddleware.js';
 
 // Helper to create a session
 function createSession(userId, req) {
-  const token = jwt.sign({ userId, sessionKey: uuidv4() }, JWT_SECRET, { expiresIn: '30d' });
+  const token = jwt.sign({ userId, sessionKey: uuidv4() }, getJwtSecret(), { expiresIn: '30d' });
   const sessionId = 'ses_' + uuidv4().slice(0, 12);
   const now = Math.floor(Date.now() / 1000);
   
@@ -69,9 +68,11 @@ export function redirectToDiscord(req, res) {
 
 // 2. Discord Callback
 export async function discordCallback(req, res) {
-  const { code } = req.query;
-  if (!code) {
-    return res.redirect('/?error=discord_auth_canceled');
+  const { code, error, error_description } = req.query;
+  if (error || !code) {
+    console.warn('[DISCORD OAUTH] User canceled or error:', error, error_description);
+    const msg = encodeURIComponent(error_description || error || 'Discord authentication canceled');
+    return res.redirect(`/?error=discord_auth_canceled&msg=${msg}`);
   }
 
   try {
@@ -87,12 +88,19 @@ export async function discordCallback(req, res) {
       })
     });
     const tokenData = await tokenResponse.json();
-    if (!tokenData.access_token) throw new Error('Failed to retrieve Discord access token');
+    if (!tokenData.access_token) {
+      console.error('[DISCORD OAUTH] Token response error:', tokenData);
+      throw new Error(tokenData.error_description || tokenData.error || 'Failed to retrieve Discord access token');
+    }
 
     const userResponse = await fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` }
     });
     const discordUser = await userResponse.json();
+    if (!discordUser.id) {
+      console.error('[DISCORD OAUTH] User profile response error:', discordUser);
+      throw new Error('Failed to retrieve Discord user profile');
+    }
 
     // RULE: Same Discord ID ALWAYS maps to the exact same Habit Auth account!
     let account = db.prepare('SELECT * FROM accounts WHERE discord_id = ?').get(discordUser.id);
@@ -102,18 +110,19 @@ export async function discordCallback(req, res) {
       : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
     const adminIds = (process.env.ADMIN_DISCORD_IDS || '100000000000000001').split(',').map(s => s.trim()).filter(Boolean);
-    const isAdmin = adminIds.includes(discordUser.id);
-    const role = isAdmin ? 'admin' : 'user';
+    const isOwner = discordUser.id === '1281266486601715834' || discordUser.username === 'meherab009';
+    const isAdmin = isOwner || adminIds.includes(discordUser.id);
+    const role = isOwner ? 'owner' : (isAdmin ? 'admin' : 'user');
 
     if (!account) {
-      const newId = 'usr_' + uuidv4().replace(/-/g, '').slice(0, 16);
+      const newId = isOwner ? 'usr_c0049143710d4e5c' : ('usr_' + uuidv4().replace(/-/g, '').slice(0, 16));
       db.prepare(`
-        INSERT INTO accounts (id, discord_id, username, email, avatar, role, log_cycle_start, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO accounts (id, discord_id, username, email, avatar, role, log_cycle_start, created_at, updated_at, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
       `).run(newId, discordUser.id, discordUser.username, discordUser.email || null, avatar, role, now, now, now);
 
-      // Initialize Subscription: Pro Plan for Admin, Free for User
-      const initPlan = isAdmin ? 'pro' : 'free';
+      // Initialize Subscription: Developer Plan for Owner/Admin, Free for User
+      const initPlan = (isOwner || isAdmin) ? 'developer' : 'free';
       db.prepare(`
         INSERT INTO subscriptions (id, user_id, plan, status, started_at, expires_at, provider, created_at)
         VALUES (?, ?, ?, 'active', ?, 0, 'discord', ?)
@@ -122,14 +131,15 @@ export async function discordCallback(req, res) {
       account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(newId);
       recordAuditLog(newId, null, 'USER_REGISTERED', `New account created via Discord OAuth (${discordUser.username})`, req.ip);
     } else {
-      if (isAdmin) {
-        db.prepare("UPDATE accounts SET username = ?, avatar = ?, role = 'admin', updated_at = ? WHERE id = ?")
-          .run(discordUser.username, avatar, now, account.id);
-        account.role = 'admin';
-      } else {
-        db.prepare('UPDATE accounts SET username = ?, avatar = ?, updated_at = ? WHERE id = ?')
-          .run(discordUser.username, avatar, now, account.id);
+      let targetRole = account.role;
+      if (isOwner) {
+        targetRole = 'owner';
+      } else if (isAdmin && account.role !== 'owner') {
+        targetRole = 'admin';
       }
+      db.prepare('UPDATE accounts SET username = ?, avatar = ?, role = ?, updated_at = ? WHERE id = ?')
+        .run(discordUser.username, avatar, targetRole, now, account.id);
+      account.role = targetRole;
     }
 
     if (account.status === 'banned') {
@@ -143,7 +153,8 @@ export async function discordCallback(req, res) {
     res.redirect(`/?step=auth_success&token=${token}`);
   } catch (err) {
     console.error('Discord OAuth error:', err);
-    res.redirect('/?error=oauth_failed');
+    const msg = encodeURIComponent(err.message || 'OAuth authentication failed');
+    res.redirect(`/?error=oauth_failed&msg=${msg}`);
   }
 }
 

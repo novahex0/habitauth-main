@@ -30,6 +30,11 @@ export default function App() {
     if (path.startsWith('/docs')) return 'docs';
     if (path.startsWith('/status')) return 'status';
 
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('step') === 'auth_success' && urlParams.get('token')) {
+      return 'dashboard';
+    }
+
     const storedUser = localStorage.getItem('habit_user');
     const storedToken = localStorage.getItem('habit_token');
     if (storedUser && storedToken) {
@@ -92,7 +97,7 @@ export default function App() {
               const refreshed = { ...parsed, ...data.user };
               setUser(refreshed);
               localStorage.setItem('habit_user', JSON.stringify(refreshed));
-            } else if (data.message === 'User account not found.' || data.code === 'ACCOUNT_BANNED' || data.message === 'Session has been revoked.' || data.message === 'Session expired or revoked.') {
+            } else if (data.message === 'User account not found.' || data.code === 'ACCOUNT_BANNED' || data.message === 'Session has been revoked.' || data.message === 'Session expired or revoked.' || data.message === 'Invalid or expired authentication token.') {
               localStorage.removeItem('habit_user');
               localStorage.removeItem('habit_token');
               setUser(null);
@@ -115,14 +120,18 @@ export default function App() {
     const stepParam = urlParams.get('step');
     const errorParam = urlParams.get('error');
 
-    if (errorParam === 'account_banned') {
-      localStorage.removeItem('habit_user');
-      localStorage.removeItem('habit_token');
-      setUser(null);
-      const reason = urlParams.get('reason') || 'Violation of platform Terms of Service.';
-      setBannedInfo({ isBanned: true, reason });
-      setLoginModalOpen(true);
-      window.history.replaceState({}, document.title, '/');
+    if (errorParam) {
+      const msg = urlParams.get('msg') || urlParams.get('reason') || errorParam;
+      if (errorParam === 'account_banned') {
+        localStorage.removeItem('habit_user');
+        localStorage.removeItem('habit_token');
+        setUser(null);
+        setBannedInfo({ isBanned: true, reason: msg });
+        setLoginModalOpen(true);
+      } else {
+        alert(`Discord Login Notice: ${msg}`);
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     if (stepParam === 'auth_success' && tokenParam) {
@@ -132,19 +141,33 @@ export default function App() {
       })
         .then(r => r.json())
         .then(data => {
-          if (data.success) {
+          if (data.success && data.user) {
             setUser(data.user);
             localStorage.setItem('habit_user', JSON.stringify(data.user));
             setCurrentView('dashboard');
             localStorage.setItem('habit_current_view', 'dashboard');
+          } else {
+            console.error('Failed to authenticate with token:', data);
+            alert(`Authentication failed: ${data.message || 'Could not load profile.'}`);
+            setCurrentView('landing');
           }
+        })
+        .catch(err => {
+          console.error('OAuth profile fetch error:', err);
+          setCurrentView('landing');
+        })
+        .finally(() => {
+          window.history.replaceState({}, document.title, window.location.pathname);
         });
-      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
   useEffect(() => {
-    if (currentView === 'dashboard' && !user) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasIncomingOAuth = urlParams.get('step') === 'auth_success' && urlParams.get('token');
+    const hasStoredToken = localStorage.getItem('habit_token');
+
+    if (currentView === 'dashboard' && !user && !hasIncomingOAuth && !hasStoredToken) {
       setCurrentView('landing');
       localStorage.setItem('habit_current_view', 'landing');
     } else {
