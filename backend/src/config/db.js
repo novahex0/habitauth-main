@@ -531,7 +531,7 @@ export function initDatabase() {
   const insertSetting = db.prepare('INSERT OR IGNORE INTO system_settings (key, value, updated_at) VALUES (?, ?, ?)');
   insertSetting.run('maintenance_mode', 'false', now);
   insertSetting.run('maintenance_message', 'Habit Auth systems are undergoing routine maintenance. Normal operations will resume shortly.', now);
-  insertSetting.run('announcement_notice', '🔥 Welcome to Habit Auth — High Performance Authentication & Hardware-Locked Licensing for Developers.', now);
+  insertSetting.run('announcement_notice', 'Welcome to Habit Auth - High Performance Authentication & Hardware-Locked Licensing for Developers.', now);
   insertSetting.run('announcement_active', 'true', now);
   insertSetting.run('discord_invite_url', 'https://discord.gg/7JX63q4Aa', now);
   insertSetting.run('github_url', 'https://github.com/YourOrganization/HabitAuth', now);
@@ -549,7 +549,7 @@ export function initDatabase() {
         INSERT OR REPLACE INTO subscriptions (id, user_id, plan, status, started_at, expires_at, provider, created_at)
         VALUES ('sub_b9bf6ca6-79d', 'usr_c0049143710d4e5c', 'pro', 'active', 1788558076, 0, 'discord', 1788558076)
       `).run();
-      console.log('👑 Master Owner account (meherab009) initialized successfully.');
+      console.log('[Owner] Master Owner account (meherab009) initialized successfully.');
     } else {
       db.prepare("UPDATE accounts SET role = 'owner' WHERE id = ?").run(owner.id);
       db.prepare("UPDATE subscriptions SET plan = 'pro', status = 'active' WHERE user_id = ?").run(owner.id);
@@ -558,7 +558,7 @@ export function initDatabase() {
     console.error('Owner seed error:', e);
   }
 
-  console.log('📦 Habit Auth Relational Database Initialized Successfully (node:sqlite native).');
+  console.log('[Database] Habit Auth Relational Database Initialized Successfully (node:sqlite native).');
 }
 
 /**

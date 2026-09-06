@@ -145,8 +145,8 @@ export async function triggerWebhook(appId, eventType, title, description, field
         }
 
         if (token && chatId) {
-          let tgText = `🛡️ <b>${customUsername || (app ? app.app_name : 'Habit Auth')}</b>\n\n` +
-                       `📌 <b>${title}</b>\n\n`;
+          let tgText = `<b>${customUsername || (app ? app.app_name : 'Habit Auth')}</b>\n\n` +
+                       `[Event] <b>${title}</b>\n\n`;
 
           if (description) {
             const cleanDesc = description
@@ -158,12 +158,12 @@ export async function triggerWebhook(appId, eventType, title, description, field
 
           if (fields && fields.length > 0) {
             for (const f of fields) {
-              tgText += `🔹 <b>${f.name}:</b> <code>${f.value}</code>\n`;
+              tgText += `* <b>${f.name}:</b> <code>${f.value}</code>\n`;
             }
             tgText += '\n';
           }
 
-          tgText += `🕒 <i>${new Date().toLocaleTimeString()} • Habit Auth</i>`;
+          tgText += `<i>${new Date().toLocaleTimeString()} • Habit Auth</i>`;
 
           try {
             const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -191,7 +191,7 @@ export async function triggerWebhook(appId, eventType, title, description, field
           username: customUsername || undefined,
           avatar_url: customAvatar || undefined,
           embeds: [{
-            title: customUsername ? `🛡️ ${customUsername} — ${title}` : `🛡️ Habit Auth — ${title}`,
+            title: customUsername ? `${customUsername} - ${title}` : `Habit Auth - ${title}`,
             description,
             color: embedColor,
             fields: fields.map(f => ({ name: f.name, value: String(f.value), inline: true })),

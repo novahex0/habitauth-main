@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { rateLimit } from 'express-rate-limit';
 import { initDatabase } from './config/db.js';
 import { seedDatabase } from './config/seed.js';
+import { restoreFromCloud, startPeriodicSync } from './services/cloudSyncService.js';
 import apiRouter from './routes/apiRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +19,10 @@ const PORT = process.env.PORT || 5000;
 // Initialize Database & Seed Development Data
 initDatabase();
 seedDatabase();
+
+// Restore persistent data from Turso Cloud on boot & start background sync
+await restoreFromCloud();
+startPeriodicSync(15000);
 
 // ── SECURITY: Remove Express fingerprint header ───────────────
 app.disable('x-powered-by');
@@ -119,8 +124,8 @@ setInterval(() => {
 
 app.listen(PORT, () => {
   console.log('====================================================');
-  console.log(`🚀 HABIT AUTH API Server is running on port ${PORT}`);
-  console.log(`🌐 Local URL: http://localhost:${PORT}`);
-  console.log('🛡️ Modern Authentication & License Infrastructure for Developers');
+  console.log(`[Habit Auth] API Server is running on port ${PORT}`);
+  console.log(`[Habit Auth] Local URL: http://localhost:${PORT}`);
+  console.log('[Habit Auth] Modern Authentication & License Infrastructure');
   console.log('====================================================');
 });
