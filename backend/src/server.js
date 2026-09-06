@@ -22,7 +22,7 @@ seedDatabase();
 
 // Restore persistent data from Turso Cloud on boot & start background sync
 await restoreFromCloud();
-startPeriodicSync(15000);
+startPeriodicSync(60000);
 
 // ── SECURITY: Remove Express fingerprint header ───────────────
 app.disable('x-powered-by');
