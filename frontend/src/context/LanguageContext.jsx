@@ -87,8 +87,8 @@ const translations = {
     faqA1: 'Every response sent from our API is cryptographically signed using an Ed25519 private key. The client SDK verifies this signature against our public key. If an attacker modifies or fakes the response payload, signature verification fails and the app terminates immediately.',
     faqQ2: 'What hardware identifiers are used for the HWID lock?',
     faqA2: 'Our multi-sensor fingerprinting engine computes a SHA-256 hash using the motherboard UUID, primary CPU processor ID, and drive volume serial numbers. Even if a user changes their network or reinstalls their operating system, the hardware lock remains valid.',
-    faqQ3: 'Can I migrate my existing users and licenses from KeyAuth?',
-    faqA3: 'Yes! Habit Auth provides a 1-click JSON/CSV importer compatible with KeyAuth schemas. You can import all your applications, users, passwords, HWIDs, and active license keys in under two minutes with zero downtime.',
+    faqQ3: 'Can I migrate my existing users and licenses from other platforms?',
+    faqA3: 'Yes! Habit Auth provides a 1-click JSON/CSV importer. You can import all your applications, users, passwords, HWIDs, and active license keys in under two minutes with zero downtime.',
     faqQ4: 'Does Habit Auth work with offline applications?',
     faqA4: 'Habit Auth offers signed offline lease tokens with custom expiration policies. Applications can cache a cryptographically signed lease token and run without an active internet connection until the lease duration expires.',
 
@@ -244,8 +244,8 @@ const translations = {
     faqA1: 'প্রতিটি এপিআই রিপ্লাই Ed25519 প্রাইভেট কি দিয়ে ডিজিটালি সাইন করা থাকে। ক্লায়েন্ট এসডিকে পাবলিক কি দ্বারা এটি যাচাই করে। কোনো আক্রমণকারী রেসপন্স পরিবর্তন করলে সিগনেচার ফেইল করে এবং অ্যাপ বন্ধ হয়ে যায়।',
     faqQ2: 'HWID লকের জন্য কোন হার্ডওয়্যার সনাক্তকারী ব্যবহার করা হয়?',
     faqA2: 'আমাদের মাল্টি-সেন্সর ইঞ্জিন মাদারবোর্ড UUID, প্রধান CPU প্রসেসর আইডি এবং ড্রাইভ সিরিয়াল নম্বর একত্রিত করে SHA-256 হ্যাশ তৈরি করে। ওএস রিইন্সটল করলেও এই লক অক্ষত থাকে।',
-    faqQ3: 'আমি কি KeyAuth থেকে আমার বর্তমান ইউজার ও লাইসেন্স মাইগ্রেট করতে পারব?',
-    faqA3: 'হ্যাঁ! হ্যাবিট অথে ১-ক্লিকেই KeyAuth এর সাথে সামঞ্জস্যপূর্ণ JSON/CSV ফাইল ইমপোর্ট করা যায়। কোনো ডাউনটাইম ছাড়াই দুই মিনিটে সব ডাটা চলে আসবে।',
+    faqQ3: 'আমি কি অন্য কোনো প্ল্যাটফর্ম থেকে আমার বর্তমান ইউজার ও লাইসেন্স মাইগ্রেট করতে পারব?',
+    faqA3: 'হ্যাঁ! হ্যাবিট অথে ১-ক্লিকেই স্ট্যান্ডার্ড JSON/CSV ফাইল ইমপোর্ট করা যায়। কোনো ডাউনটাইম ছাড়াই দুই মিনিটে সব ডাটা চলে আসবে।',
     faqQ4: 'হ্যাবিট অথ কি অফলাইন অ্যাপ্লিকেশনে কাজ করে?',
     faqA4: 'হ্যাবিট অথে রয়েছে সাইনড অফলাইন লিজ টোকেন সুবিধা। অ্যাপ্লিকেশন একটি ক্রিপ্টোগ্রাফিক লিজ ক্যাশ করে ইন্টারনেট ছাড়াই নির্ধারিত মেয়াদ পর্যন্ত চলতে পারে।',
 

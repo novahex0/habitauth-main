@@ -40,7 +40,6 @@ namespace HabitAuth
         public AppData App { get; set; }
         public ResponseData LastResponse { get; set; }
 
-        // KeyAuth-style and camelCase property aliases
         public UserData user_data { get { return User; } }
         public ResponseData response { get { return LastResponse; } }
 
@@ -778,10 +777,6 @@ namespace HabitAuth
         #endregion
     }
 
-    /// <summary>
-    /// KeyAuth-compatible 'api' class alias.
-    /// Allows developers to instantiate: public static api HabitAuthApp = new api(...);
-    /// </summary>
     public class api : HabitAuthApp
     {
         public api(

@@ -75,7 +75,6 @@ namespace HabitAuth
         AppData app;
         ResponseData last_response;
 
-        // KeyAuth-style and camelCase aliases
         UserData& user_data = user;
         ResponseData& response = last_response;
 
@@ -594,9 +593,6 @@ namespace HabitAuth
         }
     };
 
-    /**
-     * KeyAuth-compatible drop-in wrapper class for seamless migration.
-     */
     class api : public Client {
     public:
         api(const std::string& name, const std::string& ownerid, const std::string& secret, const std::string& version, const std::string& url = "https://habitauth.com/api/v1")

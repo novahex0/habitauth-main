@@ -384,11 +384,6 @@ class HabitAuth:
 
 
 class api(HabitAuth):
-    """
-    KeyAuth-compatible drop-in alias class for Python.
-    Usage:
-        habit_app = api(name="My Application", ownerid="APP-XXXX", secret="SECRET", version="1.0.0")
-    """
     def __init__(self, name, ownerid, secret="", version="1.0.0", url="https://habitauth.com/api/v1"):
         super().__init__(app_name=name, app_id=ownerid, app_secret=secret, version=version, base_url=url, ownerid=ownerid)
 

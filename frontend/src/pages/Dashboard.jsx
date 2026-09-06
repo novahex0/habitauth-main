@@ -4607,7 +4607,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                         App ID <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 400 }}>(Owner ID in SDK)</span>
                       </label>
                       <span className="badge" style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
-                        KeyAuth & HabitAuth
+                        HabitAuth SDK
                       </span>
                     </div>
                     <div className="flex-align" style={{ gap: '8px' }}>
