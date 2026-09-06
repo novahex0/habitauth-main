@@ -498,7 +498,7 @@ export async function submitPaymentOrder(req, res) {
 
         const payload = {
           username: 'Habit Auth Payment Alert',
-          avatar_url: 'https://habitauth.onrender.com/assets/logo.png',
+          avatar_url: 'https://habitauth.com/assets/logo.png',
           embeds: [
             {
               title: `New Payment Order: ${gateway.name}`,
@@ -704,7 +704,7 @@ export async function reviewOrder(req, res) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               username: 'Habit Auth Payment Alert',
-              avatar_url: 'https://habitauth.onrender.com/assets/logo.png',
+              avatar_url: 'https://habitauth.com/assets/logo.png',
               embeds: [{
                 title: 'Payment Order APPROVED & Subscription Activated',
                 description: `Admin **${adminUser.username}** approved order \`${id}\`. User has been upgraded to **${order.plan.toUpperCase()}** plan.`,
@@ -1053,7 +1053,7 @@ export async function testDiscordWebhook(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: 'Habit Auth Billing Test',
-        avatar_url: 'https://habitauth.onrender.com/assets/logo.png',
+        avatar_url: 'https://habitauth.com/assets/logo.png',
         embeds: [{
           title: 'Discord Webhook Test Successful',
           description: `Test alert triggered by admin **${user.username}**. Your payment notification webhook is active and functioning properly!`,

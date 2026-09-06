@@ -410,7 +410,7 @@ class HabitAuth {
 }
 
 class api extends HabitAuth {
-  constructor({ name, ownerid, secret = '', version = '1.0', url = 'https://habitauth.onrender.com/api/v1' } = {}) {
+  constructor({ name, ownerid, secret = '', version = '1.0', url = 'https://habitauth.com/api/v1' } = {}) {
     super({ appName: name, appId: ownerid, appSecret: secret, version, baseUrl: url });
   }
 }
