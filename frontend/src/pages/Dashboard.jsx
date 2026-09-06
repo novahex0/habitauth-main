@@ -12273,53 +12273,113 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
         </div>
       )}
 
-      {/* 5C. SUPPORT TICKET CHAT & THREAD MODAL (SPACIOUS & EXPANDED) */}
+      {/* 5C. SUPPORT TICKET CHAT & THREAD MODAL (MODERN DISCORD/LINEAR STYLE) */}
       {selectedTicket && (
         <div className="modal-overlay animate-scale-in">
           <div 
-            className="modal-content glass-panel" 
+            className="glass-panel" 
             style={{ 
-              maxWidth: '1050px', 
-              width: '94vw', 
-              height: '86vh', 
+              maxWidth: '860px', 
+              width: '92vw', 
+              height: '84vh', 
               display: 'flex', 
               flexDirection: 'column',
-              border: '1px solid rgba(59, 130, 246, 0.35)',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 40px rgba(59, 130, 246, 0.15)'
+              background: '#0d1017',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '20px',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 30px rgba(59, 130, 246, 0.12)',
+              overflow: 'hidden'
             }}
           >
-            {/* Top Modal Bar */}
-            <div className="flex-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
+            {/* Top Modal Header */}
+            <div style={{ 
+              padding: '18px 24px', 
+              background: 'rgba(18, 22, 34, 0.95)', 
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '14px'
+            }}>
               <div>
-                <div className="flex-align" style={{ gap: '10px' }}>
-                  <span className={`badge ${selectedTicket.priority === 'critical' || selectedTicket.priority === 'high' ? 'badge-danger' : 'badge-primary'}`} style={{ fontSize: '11px', padding: '4px 10px' }}>
-                    {selectedTicket.priority.toUpperCase()} PRIORITY
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                  <span style={{
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    fontSize: '10.5px',
+                    fontWeight: 800,
+                    letterSpacing: '0.4px',
+                    textTransform: 'uppercase',
+                    background: selectedTicket.priority === 'critical' ? 'rgba(239, 68, 68, 0.15)' : selectedTicket.priority === 'high' ? 'rgba(249, 115, 22, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                    color: selectedTicket.priority === 'critical' ? '#ef4444' : selectedTicket.priority === 'high' ? '#f97316' : '#60a5fa',
+                    border: `1px solid ${selectedTicket.priority === 'critical' ? 'rgba(239, 68, 68, 0.3)' : selectedTicket.priority === 'high' ? 'rgba(249, 115, 22, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
+                  }}>
+                    {selectedTicket.priority} PRIORITY
                   </span>
-                  <span className="mono-text" style={{ fontSize: '12.5px', color: 'var(--primary-light)', fontWeight: 800 }}>
+
+                  <span style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    color: '#94a3b8',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)'
+                  }}>
                     #{selectedTicket.id}
                   </span>
-                  <h3 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>{selectedTicket.title}</h3>
+
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#ffffff' }}>
+                    {selectedTicket.title}
+                  </h3>
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }} className="flex-align">
-                  <span>Client: <strong style={{ color: '#fff' }}>@{selectedTicket.client_username || selectedTicket.creator_name || 'User'}</strong></span>
-                  <span style={{ margin: '0 8px' }}>&bull;</span>
-                  <span>App: <strong style={{ color: 'var(--primary-light)' }}>{selectedTicket.app_name || 'Global'}</strong></span>
-                  <span style={{ margin: '0 8px' }}>&bull;</span>
-                  <span>Opened: {new Date(selectedTicket.created_at * 1000).toLocaleString()}</span>
-                  <span style={{ margin: '0 8px' }}>&bull;</span>
-                  <span className="badge badge-active" style={{ fontSize: '10px', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Zap size={10} /> LIVE CHAT SYNC</span>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                  <span>Client: <strong style={{ color: '#38bdf8' }}>@{selectedTicket.client_username || selectedTicket.creator_name || 'User'}</strong></span>
+                  <span style={{ opacity: 0.35 }}>•</span>
+                  <span>App: <strong style={{ color: '#ffffff' }}>{selectedTicket.app_name || 'Global'}</strong></span>
+                  <span style={{ opacity: 0.35 }}>•</span>
+                  <span>Opened: {new Date(selectedTicket.created_at * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span style={{ opacity: 0.35 }}>•</span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '10.5px',
+                    color: '#10b981',
+                    fontWeight: 700,
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    padding: '2px 7px',
+                    borderRadius: '999px',
+                    border: '1px solid rgba(16, 185, 129, 0.25)'
+                  }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+                    LIVE SYNC
+                  </span>
                 </div>
               </div>
 
-              <div className="flex-align" style={{ gap: '12px' }}>
-                <div className="flex-align" style={{ gap: '6px' }}>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Status:</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Status:</span>
                   {(currentUser?.role === 'admin' || currentUser?.role === 'owner') ? (
                     <select 
                       className="form-select" 
                       value={selectedTicket.status} 
                       onChange={(e) => handleUpdateTicketStatus(selectedTicket.id, e.target.value)}
-                      style={{ fontSize: '12.5px', padding: '6px 12px', width: 'auto', fontWeight: 700 }}
+                      style={{
+                        fontSize: '12px',
+                        padding: '6px 12px',
+                        width: 'auto',
+                        fontWeight: 700,
+                        borderRadius: '8px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#ffffff',
+                        cursor: 'pointer'
+                      }}
                     >
                       <option value="open">Status: Open</option>
                       <option value="in-progress">Status: In Progress</option>
@@ -12327,30 +12387,50 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                       <option value="closed">Status: Closed</option>
                     </select>
                   ) : (
-                    <span 
-                      className={`badge ${selectedTicket.status === 'open' ? 'badge-active' : selectedTicket.status === 'in-progress' ? 'badge-warning' : selectedTicket.status === 'resolved' ? 'badge-primary' : 'badge-inactive'}`}
-                      style={{ fontSize: '12px', padding: '5px 12px', fontWeight: 700, textTransform: 'capitalize' }}
-                      title="Only Administrators can change ticket status"
-                    >
-                      {selectedTicket.status === 'open' && 'Open'}
-                      {selectedTicket.status === 'in-progress' && 'In Progress'}
-                      {selectedTicket.status === 'resolved' && 'Resolved'}
-                      {selectedTicket.status === 'closed' && 'Closed'}
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: selectedTicket.status === 'open' ? 'rgba(16, 185, 129, 0.12)' : selectedTicket.status === 'in-progress' ? 'rgba(245, 158, 11, 0.12)' : selectedTicket.status === 'resolved' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(148, 163, 184, 0.12)',
+                      color: selectedTicket.status === 'open' ? '#10b981' : selectedTicket.status === 'in-progress' ? '#f59e0b' : selectedTicket.status === 'resolved' ? '#60a5fa' : '#94a3b8',
+                      border: `1px solid ${selectedTicket.status === 'open' ? 'rgba(16, 185, 129, 0.3)' : selectedTicket.status === 'in-progress' ? 'rgba(245, 158, 11, 0.3)' : selectedTicket.status === 'resolved' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
+                    }}>
+                      <span style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: selectedTicket.status === 'open' ? '#10b981' : selectedTicket.status === 'in-progress' ? '#f59e0b' : selectedTicket.status === 'resolved' ? '#60a5fa' : '#94a3b8'
+                      }} />
+                      {selectedTicket.status.replace('-', ' ')}
                     </span>
                   )}
                 </div>
-                <button className="icon-btn" onClick={() => setSelectedTicket(null)} style={{ padding: '8px' }}><X size={18} /></button>
-              </div>
-            </div>
 
-            {/* Original Problem Statement Box */}
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 'var(--radius-sm)', padding: '12px 16px', marginBottom: '14px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Original Issue Description
-              </span>
-              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                {selectedTicket.description}
-              </p>
+                <button 
+                  className="icon-btn" 
+                  onClick={() => setSelectedTicket(null)} 
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#94a3b8',
+                    cursor: 'pointer'
+                  }}
+                  title="Close Thread"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {/* Chat Thread Message History */}
@@ -12358,26 +12438,110 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               style={{ 
                 flex: 1, 
                 overflowY: 'auto', 
-                padding: '18px 20px', 
+                padding: '20px 24px', 
                 display: 'flex', 
                 flexDirection: 'column', 
-                gap: '14px',
-                background: 'rgba(5, 4, 12, 0.65)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid rgba(255,255,255,0.06)'
+                gap: '12px',
+                background: '#090b11'
               }}
             >
-              {ticketMessages.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
-                  <MessageSquare size={32} style={{ opacity: 0.3, marginBottom: '10px' }} />
-                  <p style={{ margin: 0, fontSize: '13px' }}>No messages in this ticket thread yet.</p>
+              {/* Initial Support Inquiry Card (Avoids ugly duplication) */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.025)',
+                border: '1px solid rgba(255, 255, 255, 0.07)',
+                borderRadius: '14px',
+                padding: '16px 20px',
+                marginBottom: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#38bdf8',
+                      fontSize: '12px',
+                      fontWeight: 800
+                    }}>
+                      {(selectedTicket.client_username || 'U')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff' }}>
+                          @{selectedTicket.client_username || selectedTicket.creator_name || 'Client'}
+                        </span>
+                        <span style={{
+                          background: 'rgba(56, 189, 248, 0.12)',
+                          color: '#38bdf8',
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
+                          borderRadius: '4px',
+                          fontSize: '9px',
+                          padding: '1px 6px',
+                          fontWeight: 800
+                        }}>
+                          ORIGINAL INQUIRY
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                    {new Date(selectedTicket.created_at * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                  </span>
                 </div>
-              ) : (
-                ticketMessages.map((msg, idx) => {
+
+                <div style={{ fontSize: '13.5px', color: '#e2e8f0', lineHeight: 1.6, paddingLeft: '42px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {selectedTicket.description}
+                </div>
+              </div>
+
+              {/* Subtle Thread Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '6px 0', opacity: 0.6 }}>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  Conversation Thread
+                </span>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              </div>
+
+              {/* Chat Thread Messages */}
+              {(() => {
+                // If the first message in DB is just the exact copy of selectedTicket.description, skip it to prevent double-printing
+                const hasFirstDuplicate = ticketMessages.length > 0 && (
+                  ticketMessages[0].message === selectedTicket.description ||
+                  ticketMessages[0].sender_id === 'client_' + selectedTicket.id
+                );
+                const displayMessages = hasFirstDuplicate ? ticketMessages.slice(1) : ticketMessages;
+
+                if (displayMessages.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '36px 20px', color: '#64748b' }}>
+                      <MessageSquare size={26} style={{ opacity: 0.35, marginBottom: '8px' }} />
+                      <p style={{ margin: 0, fontSize: '12.5px' }}>
+                        {(currentUser?.role === 'admin' || currentUser?.role === 'owner') 
+                          ? "No replies in this ticket yet. Send a message below to assist this user."
+                          : "Support team has been notified. Replies from support will appear here."}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return displayMessages.map((msg, idx) => {
                   const isMe = Boolean(
                     (currentUser?.id && msg.sender_id === currentUser.id) ||
-                    (currentUser?.username && msg.sender_name === currentUser.username) ||
-                    (currentUser?.role !== 'user' && (msg.sender_role === 'developer' || msg.sender_role === 'admin'))
+                    (currentUser?.username && (msg.sender_name === currentUser.username || msg.sender_id === currentUser.username)) ||
+                    (msg.sender_id === 'client_' + selectedTicket.id && (currentUser?.id === selectedTicket.user_id || currentUser?.username === selectedTicket.client_username))
+                  );
+
+                  const isClientMsg = Boolean(
+                    msg.sender_role === 'client' || 
+                    msg.sender_role === 'user' ||
+                    (selectedTicket?.user_id && msg.sender_id === selectedTicket.user_id) ||
+                    (selectedTicket?.client_username && (msg.sender_name === selectedTicket.client_username || msg.sender_id === 'client_' + selectedTicket.id))
                   );
 
                   return (
@@ -12385,70 +12549,112 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                       key={msg.id || idx} 
                       style={{ 
                         alignSelf: isMe ? 'flex-end' : 'flex-start',
-                        maxWidth: '75%',
-                        minWidth: '220px',
+                        maxWidth: '74%',
+                        minWidth: '170px',
                         background: isMe 
-                          ? 'linear-gradient(135deg, rgba(147, 51, 234, 0.32) 0%, rgba(109, 40, 217, 0.22) 100%)' 
-                          : 'rgba(255, 255, 255, 0.05)',
+                          ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.32) 0%, rgba(30, 58, 138, 0.28) 100%)' 
+                          : 'rgba(255, 255, 255, 0.045)',
                         border: isMe 
-                          ? '1px solid rgba(59, 130, 246, 0.5)' 
-                          : '1px solid rgba(255, 255, 255, 0.1)',
+                          ? '1px solid rgba(59, 130, 246, 0.45)' 
+                          : '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: isMe ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
-                        padding: '13px 16px',
+                        padding: '12px 16px',
                         boxShadow: isMe 
-                          ? '0 4px 20px rgba(59, 130, 246, 0.18)' 
-                          : '0 4px 16px rgba(0, 0, 0, 0.4)',
+                          ? '0 4px 18px rgba(37, 99, 235, 0.16)' 
+                          : '0 4px 14px rgba(0, 0, 0, 0.35)',
                         transition: 'all 0.2s ease'
                       }}
                     >
-                      <div className="flex-between" style={{ gap: '14px', marginBottom: '7px' }}>
-                        <div className="flex-align" style={{ gap: '6px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 800, color: isMe ? 'var(--primary-light)' : '#38bdf8' }}>
-                            {isMe ? 'You' : msg.sender_name}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', marginBottom: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: isMe ? '#93c5fd' : (isClientMsg ? '#38bdf8' : '#c084fc') }}>
+                            {isMe ? 'You' : `@${msg.sender_name || 'User'}`}
                           </span>
-                          {msg.sender_role === 'user' ? (
-                            <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: '4px', fontSize: '8.5px', padding: '1px 6px', fontWeight: 700 }}>
+                          {isClientMsg ? (
+                            <span style={{
+                              background: 'rgba(56, 189, 248, 0.12)',
+                              color: '#38bdf8',
+                              border: '1px solid rgba(56, 189, 248, 0.3)',
+                              borderRadius: '4px',
+                              fontSize: '8.5px',
+                              padding: '1px 6px',
+                              fontWeight: 800,
+                              letterSpacing: '0.4px'
+                            }}>
                               CLIENT
                             </span>
                           ) : (
-                            <span className="badge badge-primary" style={{ fontSize: '8.5px', padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: 700 }}>
-                              SUPPORT
+                            <span style={{
+                              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(126, 34, 206, 0.2))',
+                              color: '#c084fc',
+                              border: '1px solid rgba(168, 85, 247, 0.35)',
+                              borderRadius: '4px',
+                              fontSize: '8.5px',
+                              padding: '1px 6px',
+                              fontWeight: 800,
+                              letterSpacing: '0.4px'
+                            }}>
+                              SUPPORT TEAM
                             </span>
                           )}
                         </div>
-                        <span style={{ fontSize: '10px', color: isMe ? 'rgba(216, 180, 254, 0.7)' : 'rgba(148, 163, 184, 0.7)', fontWeight: 500 }}>
+
+                        <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 500 }}>
                           {new Date(msg.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <div style={{ fontSize: '13.5px', color: isMe ? '#ffffff' : '#f1f5f9', whiteSpace: 'pre-wrap', lineHeight: 1.5, wordBreak: 'break-word' }}>
+
+                      <div style={{ fontSize: '13.5px', color: isMe ? '#ffffff' : '#f1f5f9', whiteSpace: 'pre-wrap', lineHeight: 1.55, wordBreak: 'break-word' }}>
                         {msg.message}
                       </div>
                     </div>
                   );
-                })
-              )}
+                });
+              })()}
               <div ref={ticketMessagesEndRef} />
             </div>
 
             {/* Reply Input Form */}
-            <form onSubmit={handleSendTicketMessage} style={{ marginTop: '16px' }}>
-              <div className="flex-align" style={{ gap: '12px' }}>
+            <form onSubmit={handleSendTicketMessage} style={{ 
+              padding: '16px 20px', 
+              background: 'rgba(14, 17, 26, 0.98)', 
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <input 
                   type="text" 
                   className="form-input" 
-                  placeholder="Type your reply..." 
+                  placeholder={selectedTicket.status === 'closed' ? "This ticket is closed. Type here to reply and reopen..." : "Type your reply... (Press Enter to send)"} 
                   value={newTicketMessage}
                   onChange={(e) => setNewTicketMessage(e.target.value)}
-                  style={{ flex: 1, padding: '12px 16px', fontSize: '13.5px' }}
+                  style={{ 
+                    flex: 1, 
+                    padding: '12px 18px', 
+                    fontSize: '13.5px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '10px',
+                    color: '#ffffff'
+                  }}
                   autoFocus
                 />
                 <button 
                   type="submit" 
                   className="btn btn-primary" 
                   disabled={isSendingTicketMsg || !newTicketMessage.trim()}
-                  style={{ padding: '12px 24px', fontSize: '13px', whiteSpace: 'nowrap' }}
+                  style={{ 
+                    padding: '12px 22px', 
+                    fontSize: '13px', 
+                    fontWeight: 700,
+                    borderRadius: '10px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap' 
+                  }}
                 >
-                  <Send size={15} style={{ marginRight: '6px' }} /> Send Reply
+                  <Send size={14} />
+                  <span>{isSendingTicketMsg ? 'Sending...' : 'Send Reply'}</span>
                 </button>
               </div>
             </form>

@@ -92,8 +92,8 @@ export function createTicket(req, res) {
     const msgId = `msg_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
     db.prepare(`
       INSERT INTO ticket_messages (id, ticket_id, sender_id, sender_name, sender_role, message, created_at)
-      VALUES (?, ?, ?, ?, 'user', ?, ?)
-    `).run(msgId, id, 'client_' + id, username, description.trim(), now);
+      VALUES (?, ?, ?, ?, 'client', ?, ?)
+    `).run(msgId, id, user.id, username, description.trim(), now);
 
     recordAuditLog(user.id, targetAppId, 'TICKET_CREATED', `Support ticket created: '${title}' (${priority})`, req.ip);
 
@@ -147,11 +147,25 @@ export function getTicketById(req, res) {
       }
     }
 
-    const messages = db.prepare(`
+    const rawMessages = db.prepare(`
       SELECT * FROM ticket_messages 
       WHERE ticket_id = ? 
       ORDER BY created_at ASC
     `).all(ticketId);
+
+    const messages = rawMessages.map(m => {
+      const isClientMsg = (
+        m.sender_role === 'client' || 
+        m.sender_role === 'user' ||
+        (ticket.user_id && m.sender_id === ticket.user_id) ||
+        (ticket.client_username && m.sender_name === ticket.client_username) ||
+        (typeof m.sender_id === 'string' && m.sender_id.startsWith('client_'))
+      );
+      return {
+        ...m,
+        sender_role: isClientMsg ? 'client' : 'support'
+      };
+    });
 
     res.json({ success: true, ticket, messages });
   } catch (err) {
@@ -188,18 +202,22 @@ export function addTicketMessage(req, res) {
     const now = Math.floor(Date.now() / 1000);
     const msgId = `msg_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
     
-    const isClient = senderRole === 'user';
-    const role = isClient ? 'user' : (isPrivileged ? 'admin' : 'developer');
-    const name = isClient ? (ticket.client_username || 'Client') : user.username;
-    const senderId = isClient ? ('client_' + ticket.id) : user.id;
+    const isClient = senderRole === 'user' || senderRole === 'client' || user.id === ticket.user_id || user.username === ticket.client_username;
+    const role = isPrivileged ? 'support' : (isClient ? 'client' : 'support');
+    const name = user.username || (isClient ? (ticket.client_username || 'Client') : 'Support Team');
+    const senderId = user.id;
 
     db.prepare(`
       INSERT INTO ticket_messages (id, ticket_id, sender_id, sender_name, sender_role, message, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(msgId, ticketId, senderId, name, role, message.trim(), now);
 
-    // Update ticket timestamp
-    db.prepare('UPDATE tickets SET updated_at = ? WHERE id = ?').run(now, ticketId);
+    // Update ticket timestamp and auto-reopen if resolved or closed
+    if (ticket.status === 'resolved' || ticket.status === 'closed') {
+      db.prepare("UPDATE tickets SET status = 'in-progress', updated_at = ? WHERE id = ?").run(now, ticketId);
+    } else {
+      db.prepare('UPDATE tickets SET updated_at = ? WHERE id = ?').run(now, ticketId);
+    }
 
     recordAuditLog(user.id, ticket.app_id, 'TICKET_REPLY', `Reply sent on ticket '${ticket.title}'`, req.ip);
 
