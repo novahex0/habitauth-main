@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /overview
+
+Sitemap: https://habitauth.com/sitemap.xml
