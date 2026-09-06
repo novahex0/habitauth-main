@@ -3495,59 +3495,18 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
       {/* ── LEFT SIDEBAR ─────────────────────────────────────── */}
       <aside className={`sidebar ${mobileSidebarOpen ? 'open' : ''}`}>
-        {/* Brand Header — Stylish HABIT AUTH with link to Landing Page */}
-        <div className="logo-section" style={{ paddingBottom: '18px', justifyContent: 'center' }}>
+        {/* Brand Header — Minimalist Typography (No Logo) */}
+        <div className="sidebar-brand-header">
           <button
             onClick={() => onBackToLanding ? onBackToLanding() : (window.location.href = '/')}
-            title="Click to visit Landing Page"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              textDecoration: 'none',
-              transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-              borderRadius: 'var(--radius-md)',
-              outline: 'none'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px) scale(1.02)';
-              e.currentTarget.style.filter = 'drop-shadow(0 0 20px rgba(59, 130, 246, 0.8))';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0) scale(1)';
-              e.currentTarget.style.filter = 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.4))';
-            }}
+            title="Visit Landing Page"
+            className="sidebar-brand-btn"
           >
-            <img 
-              src="/logo.png" 
-              alt="Habit Auth Logo" 
-              style={{ 
-                width: '46px', 
-                height: '46px', 
-                objectFit: 'contain',
-                filter: 'drop-shadow(0 0 16px rgba(56, 189, 248, 0.65))',
-                marginBottom: '10px'
-              }} 
-            />
-            <div style={{
-              fontFamily: "'Outfit', 'Space Grotesk', system-ui, -apple-system, sans-serif",
-              fontSize: '21px',
-              fontWeight: 900,
-              letterSpacing: '2.5px',
-              background: 'linear-gradient(135deg, #ffffff 0%, #e0f2fe 35%, #93c5fd 70%, #3b82f6 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              textTransform: 'uppercase',
-              lineHeight: 1.15,
-              textShadow: '0 0 30px rgba(59, 130, 246, 0.5)'
-            }}>
-              HABIT AUTH
+            <div className="sidebar-brand-title">
+              Habit Auth
+            </div>
+            <div className="sidebar-brand-subtitle">
+              D A S H B O A R D
             </div>
           </button>
         </div>
@@ -3912,11 +3871,10 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
           <button 
             onClick={onLogout}
-            className="btn btn-secondary"
-            style={{ width: '100%', padding: '9px 12px', fontSize: '11.5px', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            className="sidebar-signout-btn"
             title="Sign Out"
           >
-            <LogOut size={13} /> {t('dashLogout')}
+            <LogOut size={15} /> <span>{t('dashLogout')}</span>
           </button>
         </div>
       </aside>
