@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "DO+M4IuFVc4=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Meherab\\Desktop\\Habit Auth\\csharp_example\\HabitAuth.Example\\HabitAuth.Example.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Meherab\\.nuget\\packages\\system.codedom\\9.0.2\\system.codedom.9.0.2.nupkg.sha512",
+    "C:\\Users\\Meherab\\.nuget\\packages\\system.management\\9.0.2\\system.management.9.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}

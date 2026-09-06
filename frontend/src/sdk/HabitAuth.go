@@ -71,7 +71,7 @@ func NewClient(appName, appID, appSecret, publicKey, version, baseURL string) *C
 		version = "1.0.0"
 	}
 	if baseURL == "" {
-		baseURL = "http://localhost:5000/api/v1"
+		baseURL = "https://habitauth.com/api/v1"
 	}
 	return &Client{
 		AppName:    appName,

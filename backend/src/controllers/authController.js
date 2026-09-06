@@ -38,7 +38,7 @@ function createSession(userId, req) {
 // 1. Discord OAuth2 Flow URL & Direct Redirect
 export function getDiscordAuthUrl(req, res) {
   const clientId = process.env.DISCORD_CLIENT_ID;
-  const redirectUri = encodeURIComponent(process.env.DISCORD_REDIRECT_URI || 'http://localhost:5000/api/v1/auth/discord/callback');
+  const redirectUri = encodeURIComponent(process.env.DISCORD_REDIRECT_URI || 'https://habitauth.com/api/v1/auth/discord/callback');
   const state = uuidv4();
 
   if (!clientId || clientId === 'your_discord_client_id_here') {
@@ -55,7 +55,7 @@ export function getDiscordAuthUrl(req, res) {
 
 export function redirectToDiscord(req, res) {
   const clientId = process.env.DISCORD_CLIENT_ID;
-  const redirectUri = encodeURIComponent(process.env.DISCORD_REDIRECT_URI || 'http://localhost:5000/api/v1/auth/discord/callback');
+  const redirectUri = encodeURIComponent(process.env.DISCORD_REDIRECT_URI || 'https://habitauth.com/api/v1/auth/discord/callback');
   const state = uuidv4();
 
   if (!clientId || clientId === 'your_discord_client_id_here') {

@@ -18,7 +18,7 @@ class HabitAuth:
     """
     HabitAuth Python Enterprise Client SDK
     """
-    def __init__(self, app_name="HabitApp", app_id=None, app_secret="", public_key="", version="1.0.0", base_url="https://habitauth.onrender.com/api/v1", ownerid=None):
+    def __init__(self, app_name="HabitApp", app_id=None, app_secret="", public_key="", version="1.0.0", base_url="https://habitauth.com/api/v1", ownerid=None):
         effective_id = app_id or ownerid
         if not effective_id:
             raise ValueError("[HabitAuth] app_id or ownerid cannot be empty.")
@@ -29,7 +29,7 @@ class HabitAuth:
         self.app_secret = app_secret
         self.public_key = public_key
         self.version = version
-        self.base_url = (base_url or "https://habitauth.onrender.com/api/v1").rstrip('/')
+        self.base_url = (base_url or "https://habitauth.com/api/v1").rstrip('/')
 
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": f"HabitAuth-Python-SDK/{version}"})
@@ -389,6 +389,6 @@ class api(HabitAuth):
     Usage:
         habit_app = api(name="My Application", ownerid="APP-XXXX", secret="SECRET", version="1.0.0")
     """
-    def __init__(self, name, ownerid, secret="", version="1.0.0", url="https://habitauth.onrender.com/api/v1"):
+    def __init__(self, name, ownerid, secret="", version="1.0.0", url="https://habitauth.com/api/v1"):
         super().__init__(app_name=name, app_id=ownerid, app_secret=secret, version=version, base_url=url, ownerid=ownerid)
 

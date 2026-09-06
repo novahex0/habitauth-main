@@ -12,9 +12,9 @@ class HabitAuth {
    * @param {string} [options.appSecret=''] - Application secret for cryptographic HMAC-SHA256 response verification
    * @param {string} [options.publicKey=''] - Application Ed25519 public key (hex) for asymmetric zero-trust verification
    * @param {string} [options.version='1.0.0'] - Client version for auto-update checks
-   * @param {string} [options.baseUrl='http://localhost:5000/api/v1'] - HabitAuth backend API URL
+   * @param {string} [options.baseUrl='https://habitauth.com/api/v1'] - HabitAuth backend API URL
    */
-  constructor({ appName = 'HabitApp', appId, appSecret = '', publicKey = '', version = '1.0.0', baseUrl = 'http://localhost:5000/api/v1' } = {}) {
+  constructor({ appName = 'HabitApp', appId, appSecret = '', publicKey = '', version = '1.0.0', baseUrl = 'https://habitauth.com/api/v1' } = {}) {
     if (!appId) throw new Error('[HabitAuth] appId is required.');
 
     this.appName = appName;

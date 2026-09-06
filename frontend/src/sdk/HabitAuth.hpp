@@ -90,7 +90,7 @@ namespace HabitAuth
          * @param ver Client version for auto-update checks
          * @param host Backend API base URL
          */
-        Client(const std::string& name, const std::string& id, const std::string& secret = "", const std::string& pub_key = "", const std::string& ver = "1.0.0", const std::string& host = "https://habitauth.onrender.com/api/v1")
+        Client(const std::string& name, const std::string& id, const std::string& secret = "", const std::string& pub_key = "", const std::string& ver = "1.0.0", const std::string& host = "https://habitauth.com/api/v1")
             : app_name(name), app_id(id), app_secret(secret), public_key(pub_key), version(ver), base_url(host)
         {
             if (app_id.empty()) {
@@ -599,7 +599,7 @@ namespace HabitAuth
      */
     class api : public Client {
     public:
-        api(const std::string& name, const std::string& ownerid, const std::string& secret, const std::string& version, const std::string& url = "https://habitauth.onrender.com/api/v1")
+        api(const std::string& name, const std::string& ownerid, const std::string& secret, const std::string& version, const std::string& url = "https://habitauth.com/api/v1")
             : Client(name, ownerid, secret, "", version, url) {}
 
         api(const std::string& name, const std::string& ownerid, const std::string& secret, const std::string& pub_key, const std::string& version, const std::string& url)

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * HabitAuth Official PHP Client SDK
  * Zero-Trust Software Authentication, Hardware Locking & Cryptographic Verification
@@ -18,7 +18,7 @@ class HabitAuth {
     public $user_data;
     public $app;
 
-    public function __construct($name = "HabitApp", $ownerid = "", $secret = "", $version = "1.0", $url = "https://habitauth.onrender.com/api/v1") {
+    public function __construct($name = "HabitApp", $ownerid = "", $secret = "", $version = "1.0", $url = "https://habitauth.com/api/v1") {
         $this->appName = $name;
         $this->appId = $ownerid;
         $this->appSecret = $secret;

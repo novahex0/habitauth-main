@@ -28,7 +28,7 @@ startPeriodicSync(15000);
 app.disable('x-powered-by');
 
 // ── SECURITY: CORS Whitelist (never wildcard with credentials) ─
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5000').split(',').map(o => o.trim());
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5000,https://habitauth.com,https://www.habitauth.com,https://habitauth.onrender.com').split(',').map(o => o.trim());
 
 app.use(cors({
   origin: function (origin, callback) {
