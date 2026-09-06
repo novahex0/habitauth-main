@@ -911,7 +911,7 @@ export default function PaymentPage() {
               {/* Title */}
               {/* Title based on gateway */}
               <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 800, marginBottom: '12px' }}>
-                {(selectedMethod === 'binance_pay' || selectedMethod === 'binance')
+                {(selectedGatewayId === 'binance_pay' || selectedGatewayId === 'binance')
                   ? (lang === 'bn' ? 'Binance Order ID দিন' : 'Enter Binance Order ID')
                   : (lang === 'bn' ? 'ট্রানজেকশন আইডি দিন' : 'Enter Transaction ID')}
               </div>
@@ -923,7 +923,7 @@ export default function PaymentPage() {
                   className="payment-white-input"
                   value={trxId}
                   onChange={(e) => setTrxId(e.target.value.toUpperCase())}
-                  placeholder={(selectedMethod === 'binance_pay' || selectedMethod === 'binance')
+                  placeholder={(selectedGatewayId === 'binance_pay' || selectedGatewayId === 'binance')
                     ? (lang === 'bn' ? "Binance Order ID (যেমন: 452654450400329728)" : "Binance Order ID (e.g. 452654450400329728)")
                     : (lang === 'bn' ? "ট্রানজেকশন আইডি দিন" : "Enter Transaction ID")}
                   style={{
@@ -968,7 +968,7 @@ export default function PaymentPage() {
                   {lang === 'bn' ? 'নির্দেশনাাবলী' : 'INSTRUCTIONS'}
                 </span>
 
-                {(activeTab === 'crypto' || selectedMethod === 'binance_pay' || selectedMethod === 'binance' || selectedMethod === 'trc20' || selectedMethod === 'crypto') && (
+                {(activeTab === 'international' || selectedGatewayId === 'binance_pay' || selectedGatewayId === 'binance' || selectedGatewayId === 'trc20') && (
                   <button
                     type="button"
                     onClick={() => setActiveInfoModal(activeInfoModal === 'qr' ? null : 'qr')}
@@ -985,7 +985,7 @@ export default function PaymentPage() {
               </div>
 
               {/* QR Code Popup (Only for Crypto / Binance) */}
-              {activeInfoModal === 'qr' && (activeTab === 'crypto' || selectedMethod === 'binance_pay' || selectedMethod === 'binance' || selectedMethod === 'trc20' || selectedMethod === 'crypto') && (
+              {activeInfoModal === 'qr' && (activeTab === 'international' || selectedGatewayId === 'binance_pay' || selectedGatewayId === 'binance' || selectedGatewayId === 'trc20') && (
                 <div style={{
                   background: '#ffffff', borderRadius: '10px', padding: '14px',
                   textAlign: 'center', color: '#0f172a', marginBottom: '14px'
@@ -1017,7 +1017,7 @@ export default function PaymentPage() {
                 </div>
 
                 <div>• {lang === 'bn' ? `পরিমাণ: ` : `Amount: `}<strong>{finalPrice} {currency}</strong> {lang === 'bn' ? 'দিয়ে SUBMIT করুন।' : 'and submit.'}</div>
-                <div>• {(selectedMethod === 'binance_pay' || selectedMethod === 'binance')
+                <div>• {(selectedGatewayId === 'binance_pay' || selectedGatewayId === 'binance')
                   ? (lang === 'bn' ? 'সফল মেসেজের Order ID ওপরের বক্সে দিন এবং VERIFY করুন।' : 'After transfer, paste Binance Order ID above and click VERIFY.')
                   : (lang === 'bn' ? 'সফল মেসেজের Transaction ID ওপরের বক্সে দিন এবং VERIFY করুন।' : 'After transfer, paste Transaction ID above and click VERIFY.')}</div>
               </div>

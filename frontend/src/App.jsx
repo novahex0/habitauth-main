@@ -296,7 +296,9 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname.toLowerCase();
-      if (path.startsWith('/docs')) {
+      if (path.startsWith('/payment')) {
+        setCurrentView('payment');
+      } else if (path.startsWith('/docs')) {
         setCurrentView('docs');
       } else if (path.startsWith('/status')) {
         setCurrentView('status');
