@@ -1,0 +1,14 @@
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\bin\Debug\net10.0\TestCsApp.exe
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\bin\Debug\net10.0\TestCsApp.deps.json
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\bin\Debug\net10.0\TestCsApp.runtimeconfig.json
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\bin\Debug\net10.0\TestCsApp.dll
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\bin\Debug\net10.0\TestCsApp.pdb
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\TestCsApp.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\TestCsApp.AssemblyInfoInputs.cache
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\TestCsApp.AssemblyInfo.cs
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\TestCsApp.csproj.CoreCompileInputs.cache
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\TestCsApp.dll
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\refint\TestCsApp.dll
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\TestCsApp.pdb
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\TestCsApp.genruntimeconfig.cache
+C:\Users\Meherab\Desktop\Habit Auth\scratch\TestCsApp\obj\Debug\net10.0\ref\TestCsApp.dll

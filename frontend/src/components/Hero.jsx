@@ -21,7 +21,25 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
     return saved !== null ? saved === 'true' : false;
   });
 
-  // Fetch dynamic landing page hero image if configured by admin
+  const formatStatNumber = (num) => {
+    if (typeof num === 'string') return num;
+    if (!num || isNaN(num)) return '0';
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M+';
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K+';
+    }
+    return num.toLocaleString() + '+';
+  };
+
+  const [platformStats, setPlatformStats] = useState({
+    applications: '1.3K+',
+    users: '12.4K+',
+    uptime: '99.99%'
+  });
+
+  // Fetch dynamic landing page hero image & platform stats
   useEffect(() => {
     fetch('/api/v1/system/config')
       .then(res => res.json())
@@ -35,9 +53,16 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
             setIsHeroImageActive(data.landing_hero_image_active);
             localStorage.setItem('habit_landing_hero_image_active', String(data.landing_hero_image_active));
           }
+          if (data.platform_stats) {
+            setPlatformStats({
+              applications: formatStatNumber(data.platform_stats.applications),
+              users: formatStatNumber(data.platform_stats.users),
+              uptime: data.platform_stats.uptime || '99.99%'
+            });
+          }
         }
       })
-      .catch(err => console.error('Failed to load hero image:', err));
+      .catch(err => console.error('Failed to load system config:', err));
   }, []);
 
   // Interactive Live Dashboard Mockup Simulation State for Hero Right Side
@@ -135,7 +160,7 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
                 style={{ width: '18px', height: '18px', objectFit: 'contain' }} 
               />
               <span className="obsidian-badge-dot" />
-              <span>Now securing 14.8K+ applications & machines</span>
+              <span>Now securing {platformStats.applications} applications & machines</span>
             </div>
 
             {/* Obsidian Clean Headline Typography */}
@@ -199,15 +224,15 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
             {/* 3 Sleek Dark Stat Boxes */}
             <div className="obsidian-stats-row">
               <div className="obsidian-stat-box">
-                <div className="obsidian-stat-number">14.8K+</div>
+                <div className="obsidian-stat-number">{platformStats.applications}</div>
                 <div className="obsidian-stat-label">Applications</div>
               </div>
               <div className="obsidian-stat-box">
-                <div className="obsidian-stat-number">1.42M+</div>
+                <div className="obsidian-stat-number">{platformStats.users}</div>
                 <div className="obsidian-stat-label">Connected Users</div>
               </div>
               <div className="obsidian-stat-box">
-                <div className="obsidian-stat-number">99.99%</div>
+                <div className="obsidian-stat-number">{platformStats.uptime}</div>
                 <div className="obsidian-stat-label">System Uptime</div>
               </div>
             </div>

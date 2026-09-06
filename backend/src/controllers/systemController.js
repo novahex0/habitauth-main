@@ -13,6 +13,26 @@ export function getSystemConfig(req, res) {
 
   const noticeUpdatedAt = timeMap['announcement_notice'] || timeMap['announcement_active'] || 0;
 
+  // Real-time platform stats: base offset + live DB counts
+  let appCount = 0;
+  let userCount = 0;
+  try {
+    const appRow = db.prepare('SELECT COUNT(*) as count FROM applications').get();
+    appCount = appRow?.count || 0;
+  } catch (e) {}
+
+  try {
+    const appUsersRow = db.prepare('SELECT COUNT(*) as count FROM application_users').get();
+    const accountsRow = db.prepare('SELECT COUNT(*) as count FROM accounts').get();
+    userCount = (appUsersRow?.count || 0) + (accountsRow?.count || 0);
+  } catch (e) {}
+
+  const baseApps = 1300;
+  const baseUsers = 12400;
+
+  const totalApps = baseApps + appCount;
+  const totalUsers = baseUsers + userCount;
+
   res.json({
     success: true,
     maintenance_mode: configMap['maintenance_mode'] === 'true',
@@ -24,7 +44,12 @@ export function getSystemConfig(req, res) {
     landing_hero_image: configMap['landing_hero_image'] || '',
     landing_hero_image_active: configMap['landing_hero_image_active'] !== 'false',
     discord_invite_url: configMap['discord_invite_url'] || 'https://discord.gg/7JX63q4Aa',
-    github_url: configMap['github_url'] || 'https://github.com/HabitAuth/HabitAuth'
+    github_url: configMap['github_url'] || 'https://github.com/HabitAuth/HabitAuth',
+    platform_stats: {
+      applications: totalApps,
+      users: totalUsers,
+      uptime: '99.99%'
+    }
   });
 }
 
