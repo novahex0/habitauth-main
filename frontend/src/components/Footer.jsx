@@ -173,7 +173,7 @@ export default function Footer({ onNavigate }) {
               </a>
 
               <a
-                href="mailto:support@habitauth.com"
+                href="mailto:habitauthentication@gmail.com"
                 title="Email Support"
                 style={{
                   width: '38px',
@@ -255,7 +255,7 @@ export default function Footer({ onNavigate }) {
                 { label: t('moreSdkIntegrations'), href: '/docs', action: (e) => handleLinkClick(e, 'docs') },
                 { label: t('moreSecurityHardening'), href: '/docs', action: (e) => handleLinkClick(e, 'docs') },
                 { label: t('footerLegal'), href: '/docs', action: (e) => handleLinkClick(e, 'docs') },
-                { label: t('navSupport'), href: 'mailto:support@habitauth.com', isExternal: true }
+                { label: t('navSupport'), href: 'mailto:habitauthentication@gmail.com', isExternal: true }
               ].map((link, idx) => (
                 <a
                   key={idx}

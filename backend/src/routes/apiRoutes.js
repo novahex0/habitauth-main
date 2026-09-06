@@ -44,7 +44,8 @@ import {
   getNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, clearAllNotifications
 } from '../controllers/featuresController.js';
 import { 
-  getTickets, createTicket, getTicketById, addTicketMessage, updateTicketStatus, deleteTicket 
+  getTickets, createTicket, getTicketById, addTicketMessage, updateTicketStatus, deleteTicket,
+  clientCreateTicket, clientListTickets, clientReplyTicket
 } from '../controllers/ticketController.js';
 import { 
   getBlacklists, addBlacklist, removeBlacklist 
@@ -251,6 +252,11 @@ router.get('/tickets/:ticketId', authenticateUser, getTicketById);
 router.post('/tickets/:ticketId/messages', authenticateUser, addTicketMessage);
 router.put('/tickets/:ticketId/status', authenticateUser, updateTicketStatus);
 router.delete('/tickets/:ticketId', authenticateUser, deleteTicket);
+
+// ── 8b. CLIENT IN-APP TICKETING (SDK) ──
+router.post('/client/tickets/create', clientCreateTicket);
+router.get('/client/tickets/list', clientListTickets);
+router.post('/client/tickets/reply', clientReplyTicket);
 
 // ── 9. HARDWARE & IP BLACKLIST SYSTEM ────────────────────────
 router.get('/blacklists', authenticateUser, getBlacklists);

@@ -12314,7 +12314,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               <div className="flex-align" style={{ gap: '12px' }}>
                 <div className="flex-align" style={{ gap: '6px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Status:</label>
-                  {currentUser?.role === 'admin' ? (
+                  {(currentUser?.role === 'admin' || currentUser?.role === 'owner') ? (
                     <select 
                       className="form-select" 
                       value={selectedTicket.status} 
