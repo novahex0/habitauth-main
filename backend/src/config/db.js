@@ -113,6 +113,7 @@ export function initDatabase() {
       last_heartbeat INTEGER DEFAULT 0,
       session_killed INTEGER DEFAULT 0,
       last_hwid_reset INTEGER DEFAULT 0,
+      hwid_lock INTEGER DEFAULT 0,
       last_ip TEXT,
       last_login INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -459,6 +460,7 @@ export function initDatabase() {
   try { db.exec("ALTER TABLE application_users ADD COLUMN last_heartbeat INTEGER DEFAULT 0;"); } catch (e) {}
   try { db.exec("ALTER TABLE application_users ADD COLUMN session_killed INTEGER DEFAULT 0;"); } catch (e) {}
   try { db.exec("ALTER TABLE application_users ADD COLUMN last_hwid_reset INTEGER DEFAULT 0;"); } catch (e) {}
+  try { db.exec("ALTER TABLE application_users ADD COLUMN hwid_lock INTEGER DEFAULT 0;"); } catch (e) {}
 
   try { db.exec("ALTER TABLE licenses ADD COLUMN is_frozen INTEGER DEFAULT 0;"); } catch (e) {}
   try { db.exec("ALTER TABLE licenses ADD COLUMN frozen_at INTEGER DEFAULT 0;"); } catch (e) {}

@@ -548,8 +548,17 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserLicense, setNewUserLicense] = useState('MANUAL_BYPASS');
   const [newUserExpiry, setNewUserExpiry] = useState('');
-  const [newUserHwidLock, setNewUserHwidLock] = useState(true);
+  const [newUserHwidLock, setNewUserHwidLock] = useState(false);
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
+
+  const handleOpenAddUserModal = () => {
+    setNewUsername('');
+    setNewUserPassword('');
+    setNewUserLicense('MANUAL_BYPASS');
+    setNewUserExpiry('');
+    setNewUserHwidLock(false);
+    setShowAddUserModal(true);
+  };
 
   // Edit User Modal Form
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -1775,6 +1784,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
       setNewUserPassword('');
       setNewUserLicense('MANUAL_BYPASS');
       setNewUserExpiry('');
+      setNewUserHwidLock(false);
       fetchCurrentApp(targetAppId);
       fetchApps();
     } catch (err) {
@@ -5105,7 +5115,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                     <Trash2 size={13} style={{ marginRight: '6px' }} /> Delete All Users ({appUsers.length})
                   </button>
                 )}
-                <button onClick={() => setShowAddUserModal(true)} className="btn btn-primary">
+                <button onClick={handleOpenAddUserModal} className="btn btn-primary">
                   <UserPlus size={15} style={{ marginRight: '6px' }} /> Add User
                 </button>
               </div>
@@ -5257,7 +5267,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                 <span style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
                   Click "+ Manually Add User" to register a client profile.
                 </span>
-                <button onClick={() => setShowAddUserModal(true)} className="btn btn-primary">+ Manually Add User</button>
+                <button onClick={handleOpenAddUserModal} className="btn btn-primary">+ Manually Add User</button>
               </div>
             ) : (
               <div className="users-card-grid">
@@ -11844,7 +11854,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                 <UserPlus size={20} color="var(--primary)" style={{ marginRight: '8px' }} />
                 Manually Add User
               </h3>
-              <button className="icon-btn" onClick={() => setShowAddUserModal(false)}><X size={16} /></button>
+              <button className="icon-btn" onClick={() => { setShowAddUserModal(false); setNewUserHwidLock(false); }}><X size={16} /></button>
             </div>
 
             <form onSubmit={handleAddUser}>
@@ -11924,7 +11934,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               </div>
 
               <div className="flex-align" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
-                <button type="button" onClick={() => setShowAddUserModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="button" onClick={() => { setShowAddUserModal(false); setNewUserHwidLock(false); }} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmittingUser}>
                   {isSubmittingUser ? 'Adding...' : 'Add User Profile'}
                 </button>

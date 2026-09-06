@@ -19,7 +19,7 @@ export function getAppUsers(req, res) {
   const users = db.prepare(`
     SELECT 
       id, app_id, username, token, license_key, hwid, sid, status, ban_reason,
-      failed_attempts, locked_until, expires_at, is_online, last_heartbeat, session_killed, last_hwid_reset,
+      failed_attempts, locked_until, expires_at, is_online, last_heartbeat, session_killed, last_hwid_reset, hwid_lock,
       last_ip, last_login, created_at
     FROM application_users
     WHERE app_id = ?
@@ -57,7 +57,8 @@ export function getAppUsers(req, res) {
 // 2. Manually Add User
 export async function createAppUser(req, res) {
   const { appId } = req.params;
-  const { username, password, license_key, expiry_date, hwid_lock = true } = req.body;
+  const { username, password, license_key, expiry_date, hwid_lock = false } = req.body;
+  const isHwidLock = (hwid_lock === true || hwid_lock === 1 || hwid_lock === 'true') ? 1 : 0;
   const userId = req.user.id;
 
   if (!username || !password) {
@@ -130,10 +131,11 @@ export async function createAppUser(req, res) {
   db.prepare(`
     INSERT INTO application_users (
       id, app_id, username, password_hash, token, license_key, hwid, sid, status, 
-      failed_attempts, locked_until, expires_at, last_ip, last_login, created_at
+      failed_attempts, locked_until, expires_at, is_online, last_heartbeat, session_killed, last_hwid_reset, hwid_lock,
+      last_ip, last_login, created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'active', 0, 0, ?, NULL, 0, ?)
-  `).run(newUserId, appId, username.trim(), passHash, userToken, boundLicense, expiresAt, now);
+    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'active', 0, 0, ?, 0, 0, 0, 0, ?, NULL, 0, ?)
+  `).run(newUserId, appId, username.trim(), passHash, userToken, boundLicense, expiresAt, isHwidLock, now);
 
   recordAuditLog(userId, appId, 'USER_CREATED', `Manually created client user '${username.trim()}'`, req.ip);
   triggerDiscordWebhook(appId, 'new_user', 'New User Registered', `User **${username.trim()}** was added to application **${app.app_name}**.`, [

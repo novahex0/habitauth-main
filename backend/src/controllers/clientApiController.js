@@ -477,7 +477,10 @@ export async function clientLogin(req, res) {
   let cleanHwid = hwid ? hwid.trim() : null;
   let cleanSid = sid ? sid.trim() : null;
 
-  if (cleanHwid) {
+  // If user has hwid_lock === 0, HWID lock is disabled (user can log in freely without machine lock)
+  const isHwidLockEnforced = user.hwid_lock === 1 || (user.hwid_lock !== 0 && user.hwid && user.hwid !== 'BYPASS' && user.hwid !== 'DISABLED');
+
+  if (cleanHwid && isHwidLockEnforced) {
     if (!user.hwid) {
       // First machine: Bind HWID automatically!
       db.prepare('UPDATE application_users SET hwid = ?, sid = ? WHERE id = ?').run(cleanHwid, cleanSid, user.id);
@@ -503,8 +506,8 @@ export async function clientLogin(req, res) {
   }
 
   // Login successful: reset failed counters and ensure HWID & IP are saved
-  db.prepare('UPDATE application_users SET failed_attempts = 0, locked_until = 0, last_login = ?, last_ip = ?, is_online = 1, last_heartbeat = ?, hwid = COALESCE(hwid, ?) WHERE id = ?')
-    .run(now, ip, now, cleanHwid, user.id);
+  db.prepare('UPDATE application_users SET failed_attempts = 0, locked_until = 0, last_login = ?, last_ip = ?, is_online = 1, last_heartbeat = ?, hwid = CASE WHEN ? = 1 THEN COALESCE(hwid, ?) ELSE hwid END WHERE id = ?')
+    .run(now, ip, now, isHwidLockEnforced ? 1 : 0, cleanHwid, user.id);
 
   recordAuditLog(app.user_id, app_id, 'LOGIN_SUCCESS', `Client user '${username}' logged in successfully`, ip);
 
