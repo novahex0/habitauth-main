@@ -4416,26 +4416,6 @@ input:checked + .slider:before {
   overflow: hidden;
 }
 
-.obsidian-cta-banner::before {
-  content: '✦';
-  position: absolute;
-  top: 24px;
-  left: 32px;
-  font-size: 20px;
-  color: rgba(255, 255, 255, 0.25);
-  pointer-events: none;
-}
-
-.obsidian-cta-banner::after {
-  content: '✦';
-  position: absolute;
-  bottom: 24px;
-  right: 32px;
-  font-size: 20px;
-  color: rgba(255, 255, 255, 0.25);
-  pointer-events: none;
-}
-
 /* ============================================================
    OBSIDIAN DESIGN SYSTEM — INPUTS, COMBOBOXES & DASHBOARD CONTROLS
    ============================================================ */

@@ -76,7 +76,7 @@ export async function createAppUser(req, res) {
   const effectivePlan = isSuperAdmin ? 'pro' : (app.effectivePlan || 'free');
   const totalUsersInApp = db.prepare('SELECT COUNT(*) as c FROM application_users WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name).c;
 
-  let maxUsers = 10;
+  let maxUsers = 25;
   if (isSuperAdmin) {
     maxUsers = 9999999;
   } else if (effectivePlan === 'pro') {
@@ -84,7 +84,7 @@ export async function createAppUser(req, res) {
   } else if (effectivePlan === 'developer') {
     maxUsers = 10000;
   } else {
-    maxUsers = 10;
+    maxUsers = 25;
   }
 
   if (totalUsersInApp >= maxUsers) {

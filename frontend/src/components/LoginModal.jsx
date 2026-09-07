@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, X, User, Lock, ArrowRight, AlertCircle, ShieldAlert, CheckCircle2, HelpCircle } from 'lucide-react';
+import { MessageSquare, X, User, Lock, Mail, ArrowRight, AlertCircle, ShieldAlert, CheckCircle2, HelpCircle } from 'lucide-react';
 
 export default function LoginModal({ isOpen, initialMode = 'signin', initialTab = 'signin', initialBannedInfo = null, onClose, onLoginSuccess }) {
   const [activeTab, setActiveTab] = useState(initialTab || initialMode || 'signin');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regUsername, setRegUsername] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showForgotNotice, setShowForgotNotice] = useState(false);
@@ -86,6 +90,59 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
         });
       } else {
         setError(data.message || 'Invalid username or password.');
+      }
+    } catch (err) {
+      setError(err.message || 'Connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!regUsername.trim() || !regPassword) {
+      setError('Please provide a username and password.');
+      return;
+    }
+    if (regUsername.trim().length < 3) {
+      setError('Username must be at least 3 characters long.');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (regEmail.trim() && (!regEmail.includes('@') || !regEmail.includes('.'))) {
+      setError('Please provide a valid email address.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: regEmail.trim(),
+          username: regUsername.trim(),
+          password: regPassword
+        })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        localStorage.setItem('habit_token', data.token);
+        localStorage.setItem('habit_user', JSON.stringify(data.user));
+        onLoginSuccess(data.user);
+        handleClose();
+      } else {
+        setError(data.message || 'Registration failed. Please try again.');
       }
     } catch (err) {
       setError(err.message || 'Connection error. Please try again.');
@@ -456,29 +513,29 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
               </div>
             )}
 
-            {/* TAB: SIGN UP (ONLY DISCORD SIGN UP!) */}
+            {/* TAB: SIGN UP (EMAIL/PASSWORD OR DISCORD) */}
             {activeTab === 'signup' ? (
-              <div style={{ textAlign: 'center' }}>
+              <div>
                 <button
                   onClick={handleDiscordOAuth}
                   disabled={loading}
                   type="button"
                   style={{
                     width: '100%',
-                    padding: '14px 20px',
-                    borderRadius: '14px',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
                     background: '#5865F2',
                     border: 'none',
                     color: '#ffffff',
-                    fontSize: '15px',
+                    fontSize: '14px',
                     fontWeight: 800,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '10px',
-                    boxShadow: '0 8px 24px rgba(88, 101, 242, 0.4)',
-                    marginBottom: '18px',
+                    boxShadow: '0 8px 24px rgba(88, 101, 242, 0.35)',
+                    marginBottom: '16px',
                     transition: 'all 0.2s ease'
                   }}
                   onMouseEnter={e => {
@@ -490,35 +547,167 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  <MessageSquare size={18} /> 
-                  <span>Sign Up with Discord</span>
+                  <MessageSquare size={16} /> 
+                  <span>Instant 1-Click Discord Sign Up</span>
                 </button>
 
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '16px',
-                  padding: '16px',
-                  textAlign: 'left',
-                  fontSize: '12px',
-                  color: '#94a3b8',
-                  lineHeight: 1.6
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px', color: '#e2e8f0', fontWeight: 700 }}>
-                    <CheckCircle2 size={16} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>Instant 1-Click Verification</span>
-                  </div>
-                  <p style={{ margin: '0 0 10px 24px' }}>
-                    Registration is powered directly by Discord OAuth. No spam, no email confirmation waiting.
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px', color: '#e2e8f0', fontWeight: 700 }}>
-                    <CheckCircle2 size={16} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>Multi-Device Direct Login Ready</span>
-                  </div>
-                  <p style={{ margin: '0 0 0 24px' }}>
-                    Once registered, you can set a custom username and password from your dashboard to log in from other devices without Discord.
-                  </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '14px 0 12px' }}>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                    or register with email & password
+                  </span>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
                 </div>
+
+                <form onSubmit={handleSignUp} style={{ textAlign: 'left' }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#e2e8f0', marginBottom: '5px' }}>
+                      Email Address
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <Mail size={15} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type="email"
+                        placeholder="developer@example.com"
+                        value={regEmail}
+                        onChange={e => setRegEmail(e.target.value)}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px 10px 38px',
+                          borderRadius: '11px',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = '#38bdf8'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#e2e8f0', marginBottom: '5px' }}>
+                      Username / Developer ID
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <User size={15} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type="text"
+                        placeholder="Choose unique username (min 3 chars)"
+                        value={regUsername}
+                        onChange={e => setRegUsername(e.target.value)}
+                        required
+                        minLength={3}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px 10px 38px',
+                          borderRadius: '11px',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = '#38bdf8'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#e2e8f0', marginBottom: '5px' }}>
+                      Password
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock size={15} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type="password"
+                        placeholder="Create password (min 6 chars)"
+                        value={regPassword}
+                        onChange={e => setRegPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px 10px 38px',
+                          borderRadius: '11px',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = '#38bdf8'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '18px' }}>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#e2e8f0', marginBottom: '5px' }}>
+                      Confirm Password
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock size={15} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type="password"
+                        placeholder="Repeat your password"
+                        value={regConfirmPassword}
+                        onChange={e => setRegConfirmPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px 10px 38px',
+                          borderRadius: '11px',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = '#38bdf8'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(180deg, #38bdf8 0%, #0284c7 100%)',
+                      color: '#ffffff',
+                      fontSize: '14px',
+                      fontWeight: 800,
+                      border: 'none',
+                      cursor: loading ? 'wait' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 18px rgba(56, 189, 248, 0.35)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {loading ? 'Creating Account...' : 'Create Developer Account'} 
+                    <ArrowRight size={15} />
+                  </button>
+                </form>
               </div>
             ) : (
               /* TAB: SIGN IN (DISCORD OR USERNAME/PASSWORD) */

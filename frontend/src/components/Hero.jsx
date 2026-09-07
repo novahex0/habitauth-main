@@ -171,7 +171,7 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
 
             {/* Obsidian Subtitle */}
             <p className="obsidian-subtitle">
-              Habit Auth is the next-generation authentication and software protection platform — military-grade Ed25519 cryptography, hardware-locked licensing, real-time Live Online Radar, and instant remote session termination built for modern developers.
+              Habit Auth is an advanced authentication and software licensing platform built for developers — featuring cryptographic verification, hardware-locked security, real-time active session monitoring, and instant remote access control.
             </p>
 
             {/* Obsidian Capsule Buttons */}
@@ -372,175 +372,18 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
                 </div>
               </div>
 
-              {/* Inner Radar Dashboard Interface */}
-              <div style={{ padding: '20px 22px', background: '#0f1117' }}>
-                
-                {/* Telemetry Header */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '16px',
-                  paddingBottom: '12px',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      background: 'rgba(16, 185, 129, 0.12)',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#10b981'
-                    }}>
-                      <Radio size={16} className="radar-pulsing-icon" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff' }}>
-                        LIVE ONLINE RADAR
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                        Active Workstation Telemetry (3s Polling)
-                      </div>
-                    </div>
-                  </div>
-
-                  <span style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    color: '#60a5fa',
-                    background: 'rgba(59, 130, 246, 0.12)',
-                    padding: '3px 10px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(59, 130, 246, 0.25)'
-                  }}>
-                    14 Online
-                  </span>
-                </div>
-
-                {/* 3 Live Workstation Session Rows (Interactive Kill Simulation) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                  {demoRadarUsers.map(u => (
-                    <div
-                      key={u.id}
-                      style={{
-                        background: u.killed ? 'rgba(239, 68, 68, 0.06)' : 'rgba(255, 255, 255, 0.02)',
-                        border: u.killed ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
-                        borderRadius: '12px',
-                        padding: '12px 14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      {/* Left: User & Machine Details */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '8px',
-                          background: u.killed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)',
-                          color: u.killed ? '#ef4444' : '#38bdf8',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '12px',
-                          fontWeight: 800
-                        }}>
-                          {u.username.charAt(0).toUpperCase()}
-                        </div>
-
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#ffffff' }}>
-                              @{u.username}
-                            </span>
-                            <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>
-                              ({u.os})
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)', fontFamily: 'var(--font-mono)' }}>
-                            {u.hwid}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: Status & Interactive Kill Button */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {u.killed ? (
-                          <span style={{
-                            fontSize: '10px',
-                            fontWeight: 800,
-                            padding: '3px 8px',
-                            borderRadius: '999px',
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            color: '#ef4444',
-                            border: '1px solid rgba(239, 68, 68, 0.3)'
-                          }}>
-                            KILLED
-                          </span>
-                        ) : (
-                          <span style={{
-                            fontSize: '10.5px',
-                            fontWeight: 700,
-                            color: '#10b981',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                            {u.ping}
-                          </span>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => toggleDemoKill(u.id)}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            background: u.killed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                            color: u.killed ? '#10b981' : '#ef4444',
-                            border: u.killed ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(239, 68, 68, 0.35)',
-                            transition: 'all 0.15s ease'
-                          }}
-                          title={u.killed ? 'Click to Revive access' : 'Click to test Instant Kill'}
-                        >
-                          {u.killed ? 'Revive' : 'Kill'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Bottom Strip */}
-                <div style={{
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  background: 'rgba(0, 0, 0, 0.35)',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: '11px',
-                  color: '#94a3b8'
-                }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <ShieldCheck size={13} color="#10b981" /> SHA-256 Anti-Tamper Shield Active
-                  </span>
-                  <span style={{ color: '#38bdf8', fontWeight: 600 }}>
-                    100% Uncrackable
-                  </span>
-                </div>
-
+              {/* Inner Radar Dashboard Interface (Desktop brand.png) */}
+              <div style={{ background: '#0a0d14', position: 'relative', overflow: 'hidden' }}>
+                <img 
+                  src="/brand.png" 
+                  alt="Habit Auth Radar & Control Center" 
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    display: 'block',
+                    objectFit: 'cover'
+                  }} 
+                />
               </div>
             </div>
             )}
@@ -559,7 +402,7 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
         {/* Section Header */}
         <span className="obsidian-section-tag">FEATURES</span>
         <h2 className="obsidian-section-title">
-          Powering Next-Gen Software & Games
+          Powering Modern Software & Games
         </h2>
         <p className="obsidian-section-subtitle">
           Everything you need to grow, manage, and protect your desktop software in one powerful platform.

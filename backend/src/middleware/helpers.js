@@ -114,7 +114,7 @@ export function checkUserLimit(req, res, next) {
   const effectivePlan = isSuperAdmin ? 'pro' : appAccess.effectivePlan;
   const userCount = db.prepare('SELECT COUNT(*) as count FROM application_users WHERE app_id = ?').get(appAccess.id)?.count || 0;
 
-  let maxAllowed = 10;
+  let maxAllowed = 25;
   if (isSuperAdmin) {
     maxAllowed = 9999999;
   } else if (effectivePlan === 'pro') {
@@ -122,7 +122,7 @@ export function checkUserLimit(req, res, next) {
   } else if (effectivePlan === 'developer') {
     maxAllowed = 10000;
   } else {
-    maxAllowed = 10;
+    maxAllowed = 25;
   }
 
   if (userCount >= maxAllowed) {

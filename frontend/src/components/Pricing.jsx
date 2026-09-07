@@ -47,7 +47,7 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
         description: 'Ideal for small utilities, hobby projects, and initial API testing.',
         features: [
           '1 Application included',
-          '10 Users maximum limit',
+          '25 Users maximum limit',
           'Hardware (HWID) fingerprinting',
           'Unguessable license keys',
           'Basic dashboard analytics',
@@ -119,7 +119,7 @@ export default function Pricing({ onSelectPlan, onOpenLogin, user, onNavigate })
         description: 'ছোট ইউটিলিটি, শখের প্রজেক্ট এবং প্রাথমিক এপিআই টেস্টিংয়ের জন্য আদর্শ।',
         features: [
           '১টি অ্যাপ্লিকেশন অন্তর্ভুক্ত',
-          '১০ জন সর্বোচ্চ ইউজার লিমিট',
+          '২৫ জন সর্বোচ্চ ইউজার লিমিট',
           'হার্ডওয়্যার (HWID) ফিঙ্গারপ্রিন্ট লক',
           'অনুমান-অযোগ্য লাইসেন্স কি',
           'বেসিক ড্যাশবোর্ড অ্যানালিটিক্স',

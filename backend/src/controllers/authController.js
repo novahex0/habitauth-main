@@ -325,7 +325,19 @@ export async function registerAccount(req, res) {
   }
 
   const cleanUsername = username.trim();
-  const cleanEmail = email && typeof email === 'string' ? email.trim() : `${cleanUsername.toLowerCase()}@habitauth.dev`;
+  const cleanEmail = email && typeof email === 'string' && email.trim().length > 0 
+    ? email.trim().toLowerCase() 
+    : `${cleanUsername.toLowerCase()}@habitauth.dev`;
+
+  if (email && typeof email === 'string' && email.trim().length > 0) {
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid email address.' });
+    }
+    const existingEmail = db.prepare('SELECT id FROM accounts WHERE LOWER(email) = ?').get(cleanEmail);
+    if (existingEmail) {
+      return res.status(409).json({ success: false, message: 'This email is already registered. Please sign in.' });
+    }
+  }
 
   // Check if username already exists
   const existing = db.prepare('SELECT id FROM accounts WHERE LOWER(username) = LOWER(?)').get(cleanUsername);

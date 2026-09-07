@@ -102,6 +102,19 @@ app.all('/api/*', (req, res) => {
 
 // Serve Frontend Static Build
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+
+// Explicit Favicon & Robots endpoints with proper caching for search bots (Googlebot)
+app.get('/favicon.ico', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(path.join(frontendDist, 'favicon.ico'));
+});
+
+app.get('/robots.txt', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.type('text/plain');
+  res.sendFile(path.join(frontendDist, 'robots.txt'));
+});
+
 app.use(express.static(frontendDist));
 
 // SPA Fallback Handler

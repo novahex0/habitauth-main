@@ -4657,7 +4657,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   ) : user?.sub_expires_at > 0 ? (
                     <span style={{ color: '#38bdf8' }}>Expires: {new Date(user.sub_expires_at * 1000).toLocaleDateString()}</span>
                   ) : isFreePlan ? (
-                    '1 App / 10 Users limit'
+                    '1 App / 25 Users limit'
                   ) : isDevPlan ? (
                     <span style={{ color: '#38bdf8' }}>100 Apps / 10,000 Users</span>
                   ) : isProPlan ? (
@@ -14278,7 +14278,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                 </div>
               ) : (
                 <div style={{ fontSize: '12px', marginTop: '6px', color: 'var(--text-muted)' }}>
-                  Current Plan: Free Tier (1 App / 10 Users)
+                  Current Plan: Free Tier (1 App / 25 Users)
                 </div>
               )}
             </div>

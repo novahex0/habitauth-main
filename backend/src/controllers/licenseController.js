@@ -41,7 +41,7 @@ export function generateLicenses(req, res) {
   const effectivePlan = isSuperAdmin ? 'pro' : (app.effectivePlan || 'free');
   const existingLicCount = db.prepare('SELECT COUNT(*) as c FROM licenses WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name).c;
 
-  let maxLicenses = 10;
+  let maxLicenses = 25;
   if (isSuperAdmin) {
     maxLicenses = 9999999;
   } else if (effectivePlan === 'pro') {
@@ -49,7 +49,7 @@ export function generateLicenses(req, res) {
   } else if (effectivePlan === 'developer') {
     maxLicenses = 10000;
   } else {
-    maxLicenses = 10;
+    maxLicenses = 25;
   }
 
   if (existingLicCount + parsedCount > maxLicenses) {
