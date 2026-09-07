@@ -1,15 +1,16 @@
 import db from '../config/db.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { recordAuditLog, triggerDiscordWebhook, sendInAppNotification } from '../middleware/helpers.js';
+import { recordAuditLog, triggerDiscordWebhook, sendInAppNotification, verifyAppAccess } from '../middleware/helpers.js';
 
 // 1. Get Application Users
 export function getAppUsers(req, res) {
   const { appId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  // Verify app ownership
-  const app = db.prepare('SELECT id FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
+  // Verify app access (owner, super admin, or team member with manage_users / admin)
+  const app = verifyAppAccess(appId, userId, 'manage_users', isSuperAdmin);
   if (!app) {
     return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
   }
@@ -22,9 +23,9 @@ export function getAppUsers(req, res) {
       failed_attempts, locked_until, expires_at, is_online, last_heartbeat, session_killed, last_hwid_reset, hwid_lock,
       last_ip, last_login, created_at
     FROM application_users
-    WHERE app_id = ?
+    WHERE app_id = ? OR app_id = ?
     ORDER BY created_at DESC
-  `).all(appId);
+  `).all(app.id, app.app_name);
 
   // Check and auto-unlock expired locks on the fly
   const sanitizedUsers = users.map(u => {
@@ -39,7 +40,7 @@ export function getAppUsers(req, res) {
     } else if (u.locked_until > 0 && u.locked_until <= now && u.status === 'locked') {
       // 24 hours passed! Automatically unlock
       db.prepare("UPDATE application_users SET status = 'active', failed_attempts = 0, locked_until = 0 WHERE id = ?").run(u.id);
-      recordAuditLog(userId, appId, 'ACCOUNT_AUTO_UNLOCKED', `User '${u.username}' automatically unlocked after 24-hour lockout expired.`, '127.0.0.1');
+      recordAuditLog(userId, app.id, 'ACCOUNT_AUTO_UNLOCKED', `User '${u.username}' automatically unlocked after 24-hour lockout expired.`, '127.0.0.1');
       effectiveStatus = 'active';
     }
 
@@ -60,27 +61,27 @@ export async function createAppUser(req, res) {
   const { username, password, license_key, expiry_date, hwid_lock = false } = req.body;
   const isHwidLock = (hwid_lock === true || hwid_lock === 1 || hwid_lock === 'true') ? 1 : 0;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Username and password are required.' });
   }
 
-  const app = db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
+  const app = req.appAccess || verifyAppAccess(appId, userId, 'manage_users', isSuperAdmin);
   if (!app) {
     return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
   }
 
-  // Plan User Limit Enforcement (Free: 10, Developer: 10,000, Pro Developer: 100,000)
-  const userPlan = req.user.plan || 'free';
-  const isSuperAdmin = req.user.role === 'admin';
-  const totalUsersInApp = db.prepare('SELECT COUNT(*) as c FROM application_users WHERE app_id = ?').get(appId).c;
+  // Plan User Limit Enforcement based on Application Owner's Plan
+  const effectivePlan = isSuperAdmin ? 'pro' : (app.effectivePlan || 'free');
+  const totalUsersInApp = db.prepare('SELECT COUNT(*) as c FROM application_users WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name).c;
 
   let maxUsers = 10;
   if (isSuperAdmin) {
     maxUsers = 9999999;
-  } else if (userPlan === 'pro') {
+  } else if (effectivePlan === 'pro') {
     maxUsers = 100000;
-  } else if (userPlan === 'developer') {
+  } else if (effectivePlan === 'developer') {
     maxUsers = 10000;
   } else {
     maxUsers = 10;
@@ -90,12 +91,12 @@ export async function createAppUser(req, res) {
     return res.status(403).json({
       success: false,
       code: 'USER_LIMIT_EXCEEDED',
-      message: `You have reached the maximum user limit (${maxUsers.toLocaleString()} Users) for the ${userPlan.toUpperCase()} Plan on this application.`
+      message: `You have reached the maximum user limit (${maxUsers.toLocaleString()} Users) for the ${effectivePlan.toUpperCase()} Plan on this application.`
     });
   }
 
   // Check unique username for this app
-  const existing = db.prepare('SELECT id FROM application_users WHERE app_id = ? AND username = ?').get(appId, username.trim());
+  const existing = db.prepare('SELECT id FROM application_users WHERE (app_id = ? OR app_id = ?) AND username = ?').get(app.id, app.app_name, username.trim());
   if (existing) {
     return res.status(409).json({ success: false, message: `Username '${username}' is already taken in this application.` });
   }
@@ -113,7 +114,7 @@ export async function createAppUser(req, res) {
 
   // If a license was provided, validate and link it
   if (boundLicense) {
-    const lic = db.prepare('SELECT * FROM licenses WHERE app_id = ? AND license_key = ?').get(appId, boundLicense);
+    const lic = db.prepare('SELECT * FROM licenses WHERE (app_id = ? OR app_id = ?) AND license_key = ?').get(app.id, app.app_name, boundLicense);
     if (lic) {
       if (lic.duration_days > 0) {
         expiresAt = now + (lic.duration_days * 86400);
@@ -135,10 +136,10 @@ export async function createAppUser(req, res) {
       last_ip, last_login, created_at
     )
     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'active', 0, 0, ?, 0, 0, 0, 0, ?, NULL, 0, ?)
-  `).run(newUserId, appId, username.trim(), passHash, userToken, boundLicense, expiresAt, isHwidLock, now);
+  `).run(newUserId, app.id, username.trim(), passHash, userToken, boundLicense, expiresAt, isHwidLock, now);
 
-  recordAuditLog(userId, appId, 'USER_CREATED', `Manually created client user '${username.trim()}'`, req.ip);
-  triggerDiscordWebhook(appId, 'new_user', 'New User Registered', `User **${username.trim()}** was added to application **${app.app_name}**.`, [
+  recordAuditLog(userId, app.id, 'USER_CREATED', `Manually created client user '${username.trim()}' (by @${req.user.username})`, req.ip);
+  triggerDiscordWebhook(app.id, 'new_user', 'New User Registered', `User **${username.trim()}** was added to application **${app.app_name}**.`, [
     { name: 'Username', value: username.trim() },
     { name: 'License', value: boundLicense || 'Manual Expiry' },
     { name: 'Expires At', value: expiresAt === 0 ? 'Lifetime' : new Date(expiresAt * 1000).toLocaleDateString() }
@@ -154,30 +155,31 @@ export async function createAppUser(req, res) {
 // 3. Reset HWID
 export function resetHwid(req, res) {
   const { appId, userId: targetUserId } = req.params;
-  const ownerId = req.user.id;
+  const actorId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = db.prepare('SELECT id FROM applications WHERE id = ? AND user_id = ?').get(appId, ownerId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, actorId, 'manage_users', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const targetUser = db.prepare('SELECT * FROM application_users WHERE id = ? AND app_id = ?').get(targetUserId, appId);
+  const targetUser = db.prepare('SELECT * FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!targetUser) return res.status(404).json({ success: false, message: 'User not found.' });
 
   db.prepare('UPDATE application_users SET hwid = NULL WHERE id = ?').run(targetUserId);
-  db.prepare('DELETE FROM devices WHERE app_id = ? AND user_id = ?').run(appId, targetUserId);
+  db.prepare('DELETE FROM devices WHERE (app_id = ? OR app_id = ?) AND user_id = ?').run(app.id, app.app_name, targetUserId);
 
   if (targetUser.license_key) {
-    db.prepare('UPDATE licenses SET bound_hwid = NULL WHERE app_id = ? AND license_key = ?').run(appId, targetUser.license_key);
+    db.prepare('UPDATE licenses SET bound_hwid = NULL WHERE (app_id = ? OR app_id = ?) AND license_key = ?').run(app.id, app.app_name, targetUser.license_key);
   }
 
-  recordAuditLog(ownerId, appId, 'HWID_RESET', `Reset HWID for user '${targetUser.username}'`, req.ip);
-  triggerDiscordWebhook(appId, 'hwid_reset', 'User HWID Reset by Admin', `Administrator reset bound HWID for user **${targetUser.username}**.`, [
+  recordAuditLog(actorId, app.id, 'HWID_RESET', `Reset HWID for user '${targetUser.username}' (by @${req.user.username})`, req.ip);
+  triggerDiscordWebhook(app.id, 'hwid_reset', 'User HWID Reset by Admin', `Administrator reset bound HWID for user **${targetUser.username}**.`, [
     { name: 'Username', value: targetUser.username },
     { name: 'Old HWID', value: targetUser.hwid || 'None' }
   ]);
   sendInAppNotification(
-    ownerId,
+    app.ownerId,
     'HWID Reset Successful',
-    `Hardware lock was reset for client user '${targetUser.username}' in app '${app.app_name}'.`,
+    `Hardware lock was reset for client user '${targetUser.username}' in app '${app.app_name}' by @${req.user.username}.`,
     'security'
   );
   res.json({ success: true, message: `HWID reset for user '${targetUser.username}'.` });
@@ -186,16 +188,17 @@ export function resetHwid(req, res) {
 // 4. Reset SID
 export function resetSid(req, res) {
   const { appId, userId: targetUserId } = req.params;
-  const ownerId = req.user.id;
+  const actorId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = db.prepare('SELECT id FROM applications WHERE id = ? AND user_id = ?').get(appId, ownerId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, actorId, 'manage_users', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const targetUser = db.prepare('SELECT username FROM application_users WHERE id = ? AND app_id = ?').get(targetUserId, appId);
+  const targetUser = db.prepare('SELECT username FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!targetUser) return res.status(404).json({ success: false, message: 'User not found.' });
 
   db.prepare('UPDATE application_users SET sid = NULL WHERE id = ?').run(targetUserId);
-  recordAuditLog(ownerId, appId, 'SID_RESET', `Reset SID for user '${targetUser.username}'`, req.ip);
+  recordAuditLog(actorId, app.id, 'SID_RESET', `Reset SID for user '${targetUser.username}' (by @${req.user.username})`, req.ip);
 
   res.json({ success: true, message: `SID reset for user '${targetUser.username}'.` });
 }
@@ -203,12 +206,13 @@ export function resetSid(req, res) {
 // 5. Toggle Ban/Unban
 export function toggleBan(req, res) {
   const { appId, userId: targetUserId } = req.params;
-  const ownerId = req.user.id;
+  const actorId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = db.prepare('SELECT id FROM applications WHERE id = ? AND user_id = ?').get(appId, ownerId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, actorId, 'manage_users', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const targetUser = db.prepare('SELECT * FROM application_users WHERE id = ? AND app_id = ?').get(targetUserId, appId);
+  const targetUser = db.prepare('SELECT * FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!targetUser) return res.status(404).json({ success: false, message: 'User not found.' });
 
   const { reason = '' } = req.body || {};
@@ -217,10 +221,10 @@ export function toggleBan(req, res) {
 
   db.prepare('UPDATE application_users SET status = ?, ban_reason = ? WHERE id = ?').run(newStatus, effectiveReason, targetUserId);
 
-  recordAuditLog(ownerId, appId, newStatus === 'banned' ? 'USER_BANNED' : 'USER_UNBANNED', `User '${targetUser.username}' marked as ${newStatus}${effectiveReason ? ` [Reason: ${effectiveReason}]` : ''}`, req.ip);
+  recordAuditLog(actorId, app.id, newStatus === 'banned' ? 'USER_BANNED' : 'USER_UNBANNED', `User '${targetUser.username}' marked as ${newStatus} by @${req.user.username}${effectiveReason ? ` [Reason: ${effectiveReason}]` : ''}`, req.ip);
 
   if (newStatus === 'banned') {
-    triggerDiscordWebhook(appId, 'user_banned', 'User Banned', `User **${targetUser.username}** has been banned from the application.${effectiveReason ? `\n**Reason:** ${effectiveReason}` : ''}`, [
+    triggerDiscordWebhook(app.id, 'user_banned', 'User Banned', `User **${targetUser.username}** has been banned from the application by **@${req.user.username}**.${effectiveReason ? `\n**Reason:** ${effectiveReason}` : ''}`, [
       { name: 'Username', value: targetUser.username },
       { name: 'Reason', value: effectiveReason || 'None' },
       { name: 'HWID', value: targetUser.hwid || 'None' },
@@ -229,9 +233,9 @@ export function toggleBan(req, res) {
   }
 
   sendInAppNotification(
-    ownerId,
+    app.ownerId,
     `Client User ${newStatus === 'banned' ? 'Banned' : 'Unbanned'}`,
-    `User '${targetUser.username}' in app '${app.app_name}' was ${newStatus}.${effectiveReason ? ` Reason: ${effectiveReason}` : ''}`,
+    `User '${targetUser.username}' in app '${app.app_name}' was ${newStatus} by @${req.user.username}.${effectiveReason ? ` Reason: ${effectiveReason}` : ''}`,
     newStatus === 'banned' ? 'warning' : 'info'
   );
 
@@ -246,16 +250,17 @@ export function toggleBan(req, res) {
 // 6. Manual Unlock (For users locked out by 5 failed attempts)
 export function unlockUser(req, res) {
   const { appId, userId: targetUserId } = req.params;
-  const ownerId = req.user.id;
+  const actorId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = db.prepare('SELECT id FROM applications WHERE id = ? AND user_id = ?').get(appId, ownerId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, actorId, 'manage_users', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const targetUser = db.prepare('SELECT * FROM application_users WHERE id = ? AND app_id = ?').get(targetUserId, appId);
+  const targetUser = db.prepare('SELECT * FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!targetUser) return res.status(404).json({ success: false, message: 'User not found.' });
 
   db.prepare("UPDATE application_users SET status = 'active', failed_attempts = 0, locked_until = 0 WHERE id = ?").run(targetUserId);
-  recordAuditLog(ownerId, appId, 'ACCOUNT_MANUALLY_UNLOCKED', `Manually unlocked user '${targetUser.username}' before 24-hour timeout.`, req.ip);
+  recordAuditLog(actorId, app.id, 'ACCOUNT_MANUALLY_UNLOCKED', `Manually unlocked user '${targetUser.username}' by @${req.user.username}`, req.ip);
 
   res.json({ success: true, message: `User '${targetUser.username}' has been unlocked successfully.` });
 }
@@ -264,12 +269,13 @@ export function unlockUser(req, res) {
 export async function updateAppUser(req, res) {
   const { appId, userId: targetUserId } = req.params;
   const { username, password, expiry_date, status } = req.body;
-  const ownerId = req.user.id;
+  const actorId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = db.prepare('SELECT id FROM applications WHERE id = ? AND user_id = ?').get(appId, ownerId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, actorId, 'manage_users', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const targetUser = db.prepare('SELECT * FROM application_users WHERE id = ? AND app_id = ?').get(targetUserId, appId);
+  const targetUser = db.prepare('SELECT * FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!targetUser) return res.status(404).json({ success: false, message: 'User not found.' });
 
   let updatedUsername = targetUser.username;
@@ -295,7 +301,7 @@ export async function updateAppUser(req, res) {
     WHERE id = ?
   `).run(updatedUsername, passHash, expiresAt, newStatus, targetUserId);
 
-  recordAuditLog(ownerId, appId, 'USER_UPDATED', `Updated details for client user '${updatedUsername}'`, req.ip);
+  recordAuditLog(actorId, app.id, 'USER_UPDATED', `Updated details for client user '${updatedUsername}' (by @${req.user.username})`, req.ip);
 
   res.json({
     success: true,
@@ -306,43 +312,41 @@ export async function updateAppUser(req, res) {
 // 8. Delete User
 export function deleteAppUser(req, res) {
   const { appId, userId: targetUserId } = req.params;
-  const ownerId = req.user.id;
+  const actorId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
   if (targetUserId === 'all') {
     return deleteAllAppUsers(req, res);
   }
 
-  const app = (req.user.role === 'admin')
-    ? db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId)
-    : db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, ownerId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, actorId, 'manage_users', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const targetUser = db.prepare('SELECT username FROM application_users WHERE id = ? AND app_id = ?').get(targetUserId, appId);
+  const targetUser = db.prepare('SELECT username FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!targetUser) return res.status(404).json({ success: false, message: 'User not found.' });
 
   db.prepare('DELETE FROM application_users WHERE id = ?').run(targetUserId);
-  db.prepare('DELETE FROM devices WHERE app_id = ? AND user_id = ?').run(appId, targetUserId);
+  db.prepare('DELETE FROM devices WHERE (app_id = ? OR app_id = ?) AND user_id = ?').run(app.id, app.app_name, targetUserId);
 
-  recordAuditLog(ownerId, appId, 'USER_DELETED', `Deleted user '${targetUser.username}'`, req.ip);
+  recordAuditLog(actorId, app.id, 'USER_DELETED', `Deleted user '${targetUser.username}' by @${req.user.username}`, req.ip);
   res.json({ success: true, message: `User '${targetUser.username}' deleted.` });
 }
 
 // 9. Delete All Users for an Application
 export function deleteAllAppUsers(req, res) {
   const { appId } = req.params;
-  const ownerId = req.user.id;
+  const actorId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = (req.user.role === 'admin')
-    ? db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId)
-    : db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, ownerId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, actorId, 'manage_users', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const countResult = db.prepare('SELECT COUNT(*) as count FROM application_users WHERE app_id = ?').get(appId);
+  const countResult = db.prepare('SELECT COUNT(*) as count FROM application_users WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name);
   const totalCount = countResult ? countResult.count : 0;
 
-  db.prepare('DELETE FROM devices WHERE app_id = ?').run(appId);
-  db.prepare('DELETE FROM application_users WHERE app_id = ?').run(appId);
+  db.prepare('DELETE FROM devices WHERE app_id = ? OR app_id = ?').run(app.id, app.app_name);
+  db.prepare('DELETE FROM application_users WHERE app_id = ? OR app_id = ?').run(app.id, app.app_name);
 
-  recordAuditLog(ownerId, appId, 'USER_DELETED', `Deleted all ${totalCount} users for application '${app.app_name}'`, req.ip);
+  recordAuditLog(actorId, app.id, 'USER_DELETED', `Deleted all ${totalCount} users for application '${app.app_name}' by @${req.user.username}`, req.ip);
   res.json({ success: true, message: `All ${totalCount} users deleted successfully.`, count: totalCount });
 }

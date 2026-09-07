@@ -1,6 +1,6 @@
 import db, { generateEd25519Keypair } from '../config/db.js';
 import { v4 as uuidv4 } from 'uuid';
-import { recordAuditLog, triggerDiscordWebhook } from '../middleware/helpers.js';
+import { recordAuditLog, triggerDiscordWebhook, verifyAppAccess } from '../middleware/helpers.js';
 
 // 1. Get all applications for the authenticated user
 export function getApplications(req, res) {
@@ -295,13 +295,8 @@ export function getLiveOnlineUsers(req, res) {
   let liveUsers = [];
 
   if (appId && appId !== 'all') {
-    let app = null;
-    if (isAdmin) {
-      app = db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId);
-    } else {
-      app = db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-    }
-    if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+    const app = verifyAppAccess(appId, userId, 'view_analytics', isAdmin);
+    if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
     liveUsers = db.prepare(`
       SELECT 
@@ -309,13 +304,13 @@ export function getLiveOnlineUsers(req, res) {
         u.session_killed, u.license_key, u.app_id, a.app_name, a.version as app_version
       FROM application_users u
       JOIN applications a ON a.id = u.app_id
-      WHERE u.app_id = ? 
+      WHERE (u.app_id = ? OR u.app_id = ?) 
         AND (u.last_heartbeat >= ? OR (u.last_login >= ? AND u.is_online = 1) OR u.session_killed = 1)
         AND u.status != 'banned'
       ORDER BY u.session_killed ASC, u.last_heartbeat DESC
-    `).all(appId, activeWindow, activeWindow);
+    `).all(app.id, app.app_name, activeWindow, activeWindow);
   } else {
-    // Global / All apps for this developer
+    // Global / All apps for this developer or team member
     if (isAdmin) {
       liveUsers = db.prepare(`
         SELECT 
@@ -334,11 +329,19 @@ export function getLiveOnlineUsers(req, res) {
           u.session_killed, u.license_key, u.app_id, a.app_name, a.version as app_version
         FROM application_users u
         JOIN applications a ON a.id = u.app_id
-        WHERE a.user_id = ? 
-          AND (u.last_heartbeat >= ? OR (u.last_login >= ? AND u.is_online = 1) OR u.session_killed = 1)
-          AND u.status != 'banned'
+        WHERE (
+          a.user_id = ? 
+          OR a.id IN (
+            SELECT app.id FROM applications app
+            JOIN teams t ON t.owner_id = app.user_id
+            JOIN team_members tm ON tm.team_id = t.id
+            WHERE tm.user_id = ? AND tm.status = 'active'
+          )
+        )
+        AND (u.last_heartbeat >= ? OR (u.last_login >= ? AND u.is_online = 1) OR u.session_killed = 1)
+        AND u.status != 'banned'
         ORDER BY u.session_killed ASC, u.last_heartbeat DESC
-      `).all(userId, activeWindow, activeWindow);
+      `).all(userId, userId, activeWindow, activeWindow);
     }
   }
 
@@ -369,22 +372,17 @@ export function killUserSession(req, res) {
   const adminId = req.user.id;
   const isAdmin = req.user.role === 'admin';
 
-  let app = null;
-  if (isAdmin) {
-    app = db.prepare('SELECT id, app_name, user_id FROM applications WHERE id = ?').get(appId);
-  } else {
-    app = db.prepare('SELECT id, app_name, user_id FROM applications WHERE id = ? AND user_id = ?').get(appId, adminId);
-  }
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, adminId, 'view_analytics', isAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const user = db.prepare('SELECT id, username, hwid FROM application_users WHERE id = ? AND app_id = ?').get(targetUserId, appId);
+  const user = db.prepare('SELECT id, username, hwid FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!user) return res.status(404).json({ success: false, message: 'User not found in this application.' });
 
   // Mark session killed and offline - persistent until revived or reset
   db.prepare('UPDATE application_users SET session_killed = 1, is_online = 0 WHERE id = ?').run(user.id);
 
-  recordAuditLog(adminId, appId, 'REMOTE_SESSION_KILLED', `Admin remotely terminated session for user '${user.username}' (HWID: ${user.hwid || 'N/A'})`, req.ip);
-  triggerDiscordWebhook(appId, 'session_killed', 'Remote Session Terminated', `Admin remotely terminated active session for user **${user.username}** in **${app.app_name}**. Immediate kill signal dispatched.`, [
+  recordAuditLog(adminId, app.id, 'REMOTE_SESSION_KILLED', `Remotely terminated session for user '${user.username}' (by @${req.user.username})`, req.ip);
+  triggerDiscordWebhook(app.id, 'session_killed', 'Remote Session Terminated', `Remotely terminated active session for user **${user.username}** in **${app.app_name}** by **@${req.user.username}**. Immediate kill signal dispatched.`, [
     { name: 'User', value: user.username },
     { name: 'HWID', value: user.hwid || 'Not bound' },
     { name: 'Action', value: 'Remote Kill (Persistent Lock)' }
@@ -402,20 +400,15 @@ export function reviveUserSession(req, res) {
   const adminId = req.user.id;
   const isAdmin = req.user.role === 'admin';
 
-  let app = null;
-  if (isAdmin) {
-    app = db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId);
-  } else {
-    app = db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, adminId);
-  }
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, adminId, 'view_analytics', isAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const user = db.prepare('SELECT id, username FROM application_users WHERE id = ? AND app_id = ?').get(targetUserId, appId);
+  const user = db.prepare('SELECT id, username FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!user) return res.status(404).json({ success: false, message: 'User not found in this application.' });
 
   db.prepare('UPDATE application_users SET session_killed = 0 WHERE id = ?').run(user.id);
 
-  recordAuditLog(adminId, appId, 'SESSION_REVIVED', `Admin revoked kill lock and re-enabled session access for user '${user.username}'`, req.ip);
+  recordAuditLog(adminId, app.id, 'SESSION_REVIVED', `Revoked kill lock and re-enabled session access for user '${user.username}' by @${req.user.username}`, req.ip);
 
   res.json({
     success: true,
@@ -429,13 +422,8 @@ export function killAllAppSessions(req, res) {
   const adminId = req.user.id;
   const isAdmin = req.user.role === 'admin';
 
-  let app = null;
-  if (isAdmin) {
-    app = db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId);
-  } else {
-    app = db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, adminId);
-  }
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, adminId, 'view_analytics', isAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
   const now = Math.floor(Date.now() / 1000);
   const activeWindow = now - 300;
@@ -443,11 +431,11 @@ export function killAllAppSessions(req, res) {
   const result = db.prepare(`
     UPDATE application_users 
     SET session_killed = 1, is_online = 0 
-    WHERE app_id = ? AND (is_online = 1 OR last_heartbeat >= ? OR last_login >= ?)
-  `).run(appId, activeWindow, activeWindow);
+    WHERE (app_id = ? OR app_id = ?) AND (is_online = 1 OR last_heartbeat >= ? OR last_login >= ?)
+  `).run(app.id, app.app_name, activeWindow, activeWindow);
 
-  recordAuditLog(adminId, appId, 'ALL_SESSIONS_KILLED', `Emergency killswitch triggered: terminated all active sessions for '${app.app_name}' (${result.changes} sessions)`, req.ip);
-  triggerDiscordWebhook(appId, 'session_killed', 'Emergency Killswitch Engaged', `Administrator engaged emergency killswitch: terminated **${result.changes}** active sessions across **${app.app_name}**.`, [
+  recordAuditLog(adminId, app.id, 'ALL_SESSIONS_KILLED', `Emergency killswitch triggered: terminated all active sessions for '${app.app_name}' (${result.changes} sessions) by @${req.user.username}`, req.ip);
+  triggerDiscordWebhook(app.id, 'session_killed', 'Emergency Killswitch Engaged', `Administrator engaged emergency killswitch: terminated **${result.changes}** active sessions across **${app.app_name}** by **@${req.user.username}**.`, [
     { name: 'Application', value: app.app_name },
     { name: 'Terminated Sessions', value: `${result.changes}` }
   ]);

@@ -1,7 +1,7 @@
 import db from '../config/db.js';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { recordAuditLog, triggerDiscordWebhook, sendInAppNotification } from '../middleware/helpers.js';
+import { recordAuditLog, triggerDiscordWebhook, sendInAppNotification, verifyAppAccess } from '../middleware/helpers.js';
 
 function generateRandomSegment(length = 4) {
   return crypto.randomBytes(length).toString('hex').slice(0, length).toUpperCase();
@@ -11,13 +11,14 @@ function generateRandomSegment(length = 4) {
 export function getLicenses(req, res) {
   const { appId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = db.prepare('SELECT id FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
   const licenses = db.prepare(`
-    SELECT * FROM licenses WHERE app_id = ? ORDER BY created_at DESC
-  `).all(appId);
+    SELECT * FROM licenses WHERE app_id = ? OR app_id = ? ORDER BY created_at DESC
+  `).all(app.id, app.app_name);
 
   res.json({ success: true, licenses });
 }
@@ -27,27 +28,25 @@ export function generateLicenses(req, res) {
   const { appId } = req.params;
   const { count = 1, duration_days = 0, prefix = 'HABIT', note = '' } = req.body;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = (req.user.role === 'admin')
-    ? db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId)
-    : db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
   const parsedCount = Math.min(Math.max(parseInt(count) || 1, 1), 100);
   const now = Math.floor(Date.now() / 1000);
   const cleanPrefix = (prefix.trim() || 'HABIT').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  // Plan License Limits (Free: 10, Developer: 10,000, Pro Developer: 100,000)
-  const userPlan = req.user.plan || 'free';
-  const isSuperAdmin = req.user.role === 'admin';
-  const existingLicCount = db.prepare('SELECT COUNT(*) as c FROM licenses WHERE app_id = ?').get(appId).c;
+  // Plan License Limits based on Application Owner's Plan
+  const effectivePlan = isSuperAdmin ? 'pro' : (app.effectivePlan || 'free');
+  const existingLicCount = db.prepare('SELECT COUNT(*) as c FROM licenses WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name).c;
 
   let maxLicenses = 10;
   if (isSuperAdmin) {
     maxLicenses = 9999999;
-  } else if (userPlan === 'pro') {
+  } else if (effectivePlan === 'pro') {
     maxLicenses = 100000;
-  } else if (userPlan === 'developer') {
+  } else if (effectivePlan === 'developer') {
     maxLicenses = 10000;
   } else {
     maxLicenses = 10;
@@ -57,13 +56,13 @@ export function generateLicenses(req, res) {
     return res.status(403).json({
       success: false,
       code: 'LICENSE_LIMIT_EXCEEDED',
-      message: `Generating ${parsedCount} licenses would exceed your ${userPlan.toUpperCase()} Plan limit (${maxLicenses.toLocaleString()} licenses). Current: ${existingLicCount}.`
+      message: `Generating ${parsedCount} licenses would exceed your ${effectivePlan.toUpperCase()} Plan limit (${maxLicenses.toLocaleString()} licenses). Current: ${existingLicCount}.`
     });
   }
 
   // Custom License Key Prefix is exclusive to Pro Developer & Admin
   let effectivePrefix = 'HABIT';
-  if (isSuperAdmin || userPlan === 'pro') {
+  if (isSuperAdmin || effectivePlan === 'pro') {
     effectivePrefix = cleanPrefix || 'HABIT';
   }
 
@@ -86,21 +85,21 @@ export function generateLicenses(req, res) {
       expiresAt = now + (duration_days * 86400);
     }
 
-    stmt.run(licId, appId, key, licToken, duration_days, note.trim(), expiresAt, now);
+    stmt.run(licId, app.id, key, licToken, duration_days, note.trim(), expiresAt, now);
     createdKeys.push(key);
   }
 
-  recordAuditLog(userId, appId, 'LICENSE_CREATED', `Generated ${parsedCount} license key(s) with prefix '${effectivePrefix}'`, req.ip);
-  triggerDiscordWebhook(appId, 'license_created', 'Licenses Generated', `Generated **${parsedCount}** license key(s) for application **${app.app_name}**.`, [
+  recordAuditLog(userId, app.id, 'LICENSE_CREATED', `Generated ${parsedCount} license key(s) with prefix '${effectivePrefix}' (by @${req.user.username})`, req.ip);
+  triggerDiscordWebhook(app.id, 'license_created', 'Licenses Generated', `Generated **${parsedCount}** license key(s) for application **${app.app_name}** by **@${req.user.username}**.`, [
     { name: 'Quantity', value: parsedCount },
     { name: 'Duration', value: duration_days === 0 ? 'Lifetime' : `${duration_days} Days` },
     { name: 'Prefix', value: cleanPrefix }
   ]);
 
   sendInAppNotification(
-    userId,
+    app.ownerId,
     'Licenses Generated',
-    `Generated ${parsedCount} license key(s) for '${app.app_name}' (Prefix: ${effectivePrefix}).`,
+    `Generated ${parsedCount} license key(s) for '${app.app_name}' (Prefix: ${effectivePrefix}) by @${req.user.username}.`,
     'info'
   );
 
@@ -115,19 +114,18 @@ export function generateLicenses(req, res) {
 export function revokeLicense(req, res) {
   const { appId, licenseId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = (req.user.role === 'admin')
-    ? db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId)
-    : db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const lic = db.prepare('SELECT * FROM licenses WHERE id = ? AND app_id = ?').get(licenseId, appId);
+  const lic = db.prepare('SELECT * FROM licenses WHERE id = ? AND (app_id = ? OR app_id = ?)').get(licenseId, app.id, app.app_name);
   if (!lic) return res.status(404).json({ success: false, message: 'License not found.' });
 
   const newStatus = lic.status === 'revoked' ? 'unused' : 'revoked';
   db.prepare('UPDATE licenses SET status = ? WHERE id = ?').run(newStatus, licenseId);
 
-  recordAuditLog(userId, appId, newStatus === 'revoked' ? 'LICENSE_REVOKED' : 'LICENSE_RESTORED', `License '${lic.license_key}' marked as ${newStatus}`, req.ip);
+  recordAuditLog(userId, app.id, newStatus === 'revoked' ? 'LICENSE_REVOKED' : 'LICENSE_RESTORED', `License '${lic.license_key}' marked as ${newStatus} by @${req.user.username}`, req.ip);
   res.json({ success: true, message: `License '${lic.license_key}' status updated to ${newStatus}.` });
 }
 
@@ -135,17 +133,16 @@ export function revokeLicense(req, res) {
 export function resetLicenseHwid(req, res) {
   const { appId, licenseId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = (req.user.role === 'admin')
-    ? db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId)
-    : db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const lic = db.prepare('SELECT * FROM licenses WHERE id = ? AND app_id = ?').get(licenseId, appId);
+  const lic = db.prepare('SELECT * FROM licenses WHERE id = ? AND (app_id = ? OR app_id = ?)').get(licenseId, app.id, app.app_name);
   if (!lic) return res.status(404).json({ success: false, message: 'License not found.' });
 
   db.prepare('UPDATE licenses SET bound_hwid = NULL WHERE id = ?').run(licenseId);
-  recordAuditLog(userId, appId, 'HWID_RESET', `Reset bound HWID on license '${lic.license_key}'`, req.ip);
+  recordAuditLog(userId, app.id, 'HWID_RESET', `Reset bound HWID on license '${lic.license_key}' by @${req.user.username}`, req.ip);
 
   res.json({ success: true, message: `Hardware profile reset on license '${lic.license_key}'.` });
 }
@@ -154,21 +151,20 @@ export function resetLicenseHwid(req, res) {
 export function deleteLicense(req, res) {
   const { appId, licenseId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
   if (licenseId === 'all') {
     return deleteAllAppLicenses(req, res);
   }
 
-  const app = (req.user.role === 'admin')
-    ? db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId)
-    : db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const lic = db.prepare('SELECT license_key FROM licenses WHERE id = ? AND app_id = ?').get(licenseId, appId);
+  const lic = db.prepare('SELECT license_key FROM licenses WHERE id = ? AND (app_id = ? OR app_id = ?)').get(licenseId, app.id, app.app_name);
   if (!lic) return res.status(404).json({ success: false, message: 'License not found.' });
 
   db.prepare('DELETE FROM licenses WHERE id = ?').run(licenseId);
-  recordAuditLog(userId, appId, 'LICENSE_DELETED', `Deleted license key '${lic.license_key}'`, req.ip);
+  recordAuditLog(userId, app.id, 'LICENSE_DELETED', `Deleted license key '${lic.license_key}' by @${req.user.username}`, req.ip);
 
   res.json({ success: true, message: `License '${lic.license_key}' deleted.` });
 }
@@ -178,21 +174,21 @@ export function bulkGenerateLicenses(req, res) {
   const { appId } = req.params;
   const { count = 100, duration_days = 0, prefix = '', mask = '', note = '' } = req.body;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const userPlan = req.user.plan || 'free';
-  const isAdmin = req.user.role === 'admin';
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
+
+  const effectivePlan = isSuperAdmin ? 'pro' : (app.effectivePlan || 'free');
   const parsedCount = Math.min(Math.max(parseInt(count) || 10, 1), 1000);
 
-  if (userPlan === 'free' && !isAdmin && parsedCount > 5) {
+  if (effectivePlan === 'free' && !isSuperAdmin && parsedCount > 5) {
     return res.status(403).json({
       success: false,
       code: 'PREMIUM_FEATURE_REQUIRED',
       message: 'Bulk License Generation (> 5 keys) is exclusive to Developer ($1.20/mo) and Pro ($3.20/mo) plans.'
     });
   }
-
-  const app = db.prepare('SELECT id, app_name, custom_key_mask FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
 
   let effectiveMask = (mask || app.custom_key_mask || '').trim();
   if (effectiveMask) {
@@ -235,7 +231,7 @@ export function bulkGenerateLicenses(req, res) {
       if (duration_days > 0) {
         expiresAt = now + (duration_days * 86400);
       }
-      stmt.run(licId, appId, key, licToken, duration_days, (note || '').trim(), expiresAt, now);
+      stmt.run(licId, app.id, key, licToken, duration_days, (note || '').trim(), expiresAt, now);
       createdKeys.push(key);
     }
     db.exec('COMMIT;');
@@ -248,8 +244,8 @@ export function bulkGenerateLicenses(req, res) {
     });
   }
 
-  recordAuditLog(userId, appId, 'BULK_LICENSES_CREATED', `Bulk generated ${parsedCount} license key(s) with format '${effectiveMask || cleanPrefix}'`, req.ip);
-  triggerDiscordWebhook(appId, 'license_created', 'Bulk Licenses Generated', `Bulk created **${parsedCount}** license keys for **${app.app_name}**.`, [
+  recordAuditLog(userId, app.id, 'BULK_LICENSES_CREATED', `Bulk generated ${parsedCount} license key(s) with format '${effectiveMask || cleanPrefix}' (by @${req.user.username})`, req.ip);
+  triggerDiscordWebhook(app.id, 'license_created', 'Bulk Licenses Generated', `Bulk created **${parsedCount}** license keys for **${app.app_name}** by **@${req.user.username}**.`, [
     { name: 'Count', value: parsedCount },
     { name: 'Duration', value: duration_days === 0 ? 'Lifetime' : `${duration_days} Days` },
     { name: 'Format', value: effectiveMask || `${cleanPrefix}-XXXX-XXXX` }
@@ -268,12 +264,13 @@ export function exportLicenses(req, res) {
   const { appId } = req.params;
   const { format = 'txt', status = 'all' } = req.query;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  let query = 'SELECT * FROM licenses WHERE app_id = ?';
-  const params = [appId];
+  let query = 'SELECT * FROM licenses WHERE app_id = ? OR app_id = ?';
+  const params = [app.id, app.app_name];
   if (status && status !== 'all') {
     query += ' AND status = ?';
     params.push(status);
@@ -315,20 +312,21 @@ export function exportLicenses(req, res) {
 export function toggleFreezeLicenses(req, res) {
   const { appId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = db.prepare('SELECT id, app_name, subscriptions_frozen, frozen_at FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
   const now = Math.floor(Date.now() / 1000);
   const currentlyFrozen = !!app.subscriptions_frozen;
 
   if (!currentlyFrozen) {
     // FREEZE NOW
-    db.prepare('UPDATE applications SET subscriptions_frozen = 1, frozen_at = ? WHERE id = ?').run(now, appId);
-    db.prepare("UPDATE licenses SET is_frozen = 1, frozen_at = ? WHERE app_id = ? AND status = 'active'").run(now, appId);
+    db.prepare('UPDATE applications SET subscriptions_frozen = 1, frozen_at = ? WHERE id = ?').run(now, app.id);
+    db.prepare("UPDATE licenses SET is_frozen = 1, frozen_at = ? WHERE (app_id = ? OR app_id = ?) AND status = 'active'").run(now, app.id, app.app_name);
 
-    recordAuditLog(userId, appId, 'SUBSCRIPTIONS_FROZEN', `Froze all active subscriptions and licenses for maintenance.`, req.ip);
-    triggerDiscordWebhook(appId, 'maintenance_frozen', 'Subscriptions Frozen', `All active subscriptions for **${app.app_name}** have been frozen for maintenance. Time is paused.`, []);
+    recordAuditLog(userId, app.id, 'SUBSCRIPTIONS_FROZEN', `Froze all active subscriptions and licenses for maintenance.`, req.ip);
+    triggerDiscordWebhook(app.id, 'maintenance_frozen', 'Subscriptions Frozen', `All active subscriptions for **${app.app_name}** have been frozen for maintenance. Time is paused.`, []);
 
     return res.json({
       success: true,
@@ -343,19 +341,19 @@ export function toggleFreezeLicenses(req, res) {
     db.prepare(`
       UPDATE licenses 
       SET is_frozen = 0, frozen_at = 0, expires_at = expires_at + ? 
-      WHERE app_id = ? AND status = 'active' AND expires_at > 0
-    `).run(frozenDuration, appId);
+      WHERE (app_id = ? OR app_id = ?) AND status = 'active' AND expires_at > 0
+    `).run(frozenDuration, app.id, app.app_name);
 
     db.prepare(`
       UPDATE application_users 
       SET expires_at = expires_at + ? 
-      WHERE app_id = ? AND status = 'active' AND expires_at > 0
-    `).run(frozenDuration, appId);
+      WHERE (app_id = ? OR app_id = ?) AND status = 'active' AND expires_at > 0
+    `).run(frozenDuration, app.id, app.app_name);
 
-    db.prepare('UPDATE applications SET subscriptions_frozen = 0, frozen_at = 0 WHERE id = ?').run(appId);
+    db.prepare('UPDATE applications SET subscriptions_frozen = 0, frozen_at = 0 WHERE id = ?').run(app.id);
 
-    recordAuditLog(userId, appId, 'SUBSCRIPTIONS_RESUMED', `Resumed subscriptions. Extended all active user validity by ${frozenHours} hour(s).`, req.ip);
-    triggerDiscordWebhook(appId, 'maintenance_resumed', 'Subscriptions Resumed', `Subscriptions for **${app.app_name}** resumed! Expirations automatically extended by **${frozenHours} hours**.`, []);
+    recordAuditLog(userId, app.id, 'SUBSCRIPTIONS_RESUMED', `Resumed subscriptions. Extended all active user validity by ${frozenHours} hour(s).`, req.ip);
+    triggerDiscordWebhook(app.id, 'maintenance_resumed', 'Subscriptions Resumed', `Subscriptions for **${app.app_name}** resumed! Expirations automatically extended by **${frozenHours} hours**.`, []);
 
     return res.json({
       success: true,
@@ -370,17 +368,16 @@ export function toggleFreezeLicenses(req, res) {
 export function deleteAllAppLicenses(req, res) {
   const { appId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin';
 
-  const app = (req.user.role === 'admin')
-    ? db.prepare('SELECT id, app_name FROM applications WHERE id = ?').get(appId)
-    : db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const app = verifyAppAccess(appId, userId, 'manage_licenses', isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
-  const countResult = db.prepare('SELECT COUNT(*) as count FROM licenses WHERE app_id = ?').get(appId);
+  const countResult = db.prepare('SELECT COUNT(*) as count FROM licenses WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name);
   const totalCount = countResult ? countResult.count : 0;
 
-  db.prepare('DELETE FROM licenses WHERE app_id = ?').run(appId);
-  recordAuditLog(userId, appId, 'LICENSE_DELETED', `Deleted all ${totalCount} licenses for application '${app.app_name}'`, req.ip);
+  db.prepare('DELETE FROM licenses WHERE app_id = ? OR app_id = ?').run(app.id, app.app_name);
+  recordAuditLog(userId, app.id, 'LICENSE_DELETED', `Deleted all ${totalCount} licenses for application '${app.app_name}' by @${req.user.username}`, req.ip);
 
   res.json({ success: true, message: `All ${totalCount} licenses deleted successfully.`, count: totalCount });
 }

@@ -31,21 +31,95 @@ export function checkAppLimit(req, res, next) {
   next();
 }
 
+// Centralized App Access & Permissions Verifier (Supports Direct Owner, Super Admin & Active Team Members)
+export function verifyAppAccess(appId, userId, requiredPerm = null, isSuperAdmin = false) {
+  if (!appId || !userId) return null;
+
+  // 1. Super Admin access: can access any application
+  if (isSuperAdmin) {
+    const app = db.prepare('SELECT * FROM applications WHERE id = ? OR app_name = ?').get(appId, appId);
+    if (app) {
+      const ownerSub = db.prepare('SELECT plan FROM subscriptions WHERE user_id = ?').get(app.user_id);
+      const ownerAcc = db.prepare('SELECT plan, role FROM accounts WHERE id = ?').get(app.user_id);
+      const effectivePlan = (ownerAcc?.role === 'admin') ? 'pro' : (ownerSub?.plan || ownerAcc?.plan || 'pro');
+      return { ...app, accessRole: 'admin', isAdmin: true, effectivePlan, ownerId: app.user_id, isTeamAccess: false };
+    }
+    return null;
+  }
+
+  // 2. Direct Application Owner check
+  const directApp = db.prepare('SELECT * FROM applications WHERE (id = ? OR app_name = ?) AND user_id = ?').get(appId, appId, userId);
+  if (directApp) {
+    const ownerSub = db.prepare('SELECT plan FROM subscriptions WHERE user_id = ?').get(userId);
+    const ownerAcc = db.prepare('SELECT plan, role FROM accounts WHERE id = ?').get(userId);
+    const effectivePlan = (ownerAcc?.role === 'admin') ? 'pro' : (ownerSub?.plan || ownerAcc?.plan || 'free');
+    return { ...directApp, accessRole: 'owner', isAdmin: true, effectivePlan, ownerId: userId, isTeamAccess: false };
+  }
+
+  // 3. Team Member Access check
+  const teamApp = db.prepare(`
+    SELECT tm.role, tm.permissions, a.*, a.user_id as app_owner_id
+    FROM applications a
+    JOIN teams t ON t.owner_id = a.user_id
+    JOIN team_members tm ON tm.team_id = t.id
+    WHERE (a.id = ? OR a.app_name = ?) AND tm.user_id = ? AND tm.status = 'active'
+  `).get(appId, appId, userId);
+
+  if (!teamApp) return null;
+
+  const role = (teamApp.role || 'developer').toLowerCase();
+  let perms = {};
+  try {
+    perms = typeof teamApp.permissions === 'string' ? JSON.parse(teamApp.permissions) : (teamApp.permissions || {});
+  } catch (e) {
+    perms = {};
+  }
+
+  const isTeamAdmin = (role === 'admin');
+
+  // If a specific permission is required, check admin role or permission flag
+  if (requiredPerm) {
+    if (!isTeamAdmin && !perms[requiredPerm]) {
+      return null;
+    }
+  }
+
+  // Resolve application owner's plan for quota limits
+  const ownerSub = db.prepare('SELECT plan FROM subscriptions WHERE user_id = ?').get(teamApp.app_owner_id);
+  const ownerAcc = db.prepare('SELECT plan, role FROM accounts WHERE id = ?').get(teamApp.app_owner_id);
+  const effectivePlan = (ownerAcc?.role === 'admin') ? 'pro' : (ownerSub?.plan || ownerAcc?.plan || 'developer');
+
+  return {
+    ...teamApp,
+    id: teamApp.id,
+    accessRole: role,
+    isAdmin: isTeamAdmin,
+    permissions: perms,
+    effectivePlan,
+    ownerId: teamApp.app_owner_id,
+    isTeamAccess: true
+  };
+}
+
 export function checkUserLimit(req, res, next) {
   const user = req.user;
-  // SECURITY: treat expired subscriptions as free plan
-  const isExpired = user.sub_status === 'expired';
-  const userPlan = (isExpired ? 'free' : user.plan) || 'free';
   const isSuperAdmin = user.role === 'admin';
   const appId = req.params.appId || req.body.appId;
-  const userCount = db.prepare('SELECT COUNT(*) as count FROM application_users WHERE app_id = ?').get(appId)?.count || 0;
+
+  const appAccess = verifyAppAccess(appId, user.id, 'manage_users', isSuperAdmin);
+  if (!appAccess) {
+    return res.status(403).json({ success: false, message: 'Application not found or unauthorized.' });
+  }
+
+  const effectivePlan = isSuperAdmin ? 'pro' : appAccess.effectivePlan;
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM application_users WHERE app_id = ?').get(appAccess.id)?.count || 0;
 
   let maxAllowed = 10;
   if (isSuperAdmin) {
     maxAllowed = 9999999;
-  } else if (userPlan === 'pro') {
+  } else if (effectivePlan === 'pro') {
     maxAllowed = 100000;
-  } else if (userPlan === 'developer') {
+  } else if (effectivePlan === 'developer') {
     maxAllowed = 10000;
   } else {
     maxAllowed = 10;
@@ -55,9 +129,10 @@ export function checkUserLimit(req, res, next) {
     return res.status(403).json({
       success: false,
       code: 'USER_LIMIT_REACHED',
-      message: `You have reached the ${maxAllowed.toLocaleString()} user limit for this application on the ${userPlan.toUpperCase()} plan. Upgrade to a higher plan for more users.`
+      message: `Maximum user limit (${maxAllowed.toLocaleString()} users) reached on this application for the ${effectivePlan.toUpperCase()} plan.`
     });
   }
+  req.appAccess = appAccess;
   next();
 }
 

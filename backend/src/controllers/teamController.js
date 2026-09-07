@@ -542,7 +542,9 @@ export function getTeamAppUsers(req, res) {
   if (!app) return res.status(404).json({ success: false, message: 'Team application not found.' });
 
   const users = db.prepare(`
-    SELECT id, app_id, username, license_key, hwid, sid, status, failed_attempts, locked_until, expires_at, last_login, created_at
+    SELECT id, app_id, username, token, license_key, hwid, sid, status, ban_reason,
+           failed_attempts, locked_until, expires_at, is_online, last_heartbeat, session_killed, last_hwid_reset, hwid_lock,
+           last_ip, last_login, created_at
     FROM application_users
     WHERE app_id = ? OR app_id = ?
     ORDER BY created_at DESC

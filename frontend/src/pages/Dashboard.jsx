@@ -835,7 +835,28 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
   const [sdkTab, setSdkTab] = useState('csharp');
 
   // Team Scoped App View (for members inspecting team owner's apps)
-  const [teamAppScope, setTeamAppScope] = useState(null); // { appId, appName, users: [], licenses: [], activeTab: 'users' | 'licenses' }
+  const [teamAppScope, setTeamAppScope] = useState(null); // { appId, appName, users: [], licenses: [], radarUsers: [], activeTab: 'users' | 'licenses' | 'radar' }
+  const [showTeamAddUserModal, setShowTeamAddUserModal] = useState(false);
+  const [showTeamGenLicModal, setShowTeamGenLicModal] = useState(false);
+  const [teamUserSearch, setTeamUserSearch] = useState('');
+  const [teamLicSearch, setTeamLicSearch] = useState('');
+  const [teamRadarSearch, setTeamRadarSearch] = useState('');
+
+  // Team Add User State
+  const [teamNewUsername, setTeamNewUsername] = useState('');
+  const [teamNewPassword, setTeamNewPassword] = useState('');
+  const [teamNewLicense, setTeamNewLicense] = useState('MANUAL_BYPASS');
+  const [teamNewExpiry, setTeamNewExpiry] = useState('');
+  const [teamNewHwidLock, setTeamNewHwidLock] = useState(false);
+  const [isSubmittingTeamUser, setIsSubmittingTeamUser] = useState(false);
+
+  // Team Generate License State
+  const [teamGenCount, setTeamGenCount] = useState(1);
+  const [teamGenDuration, setTeamGenDuration] = useState('30');
+  const [teamGenCustomDuration, setTeamGenCustomDuration] = useState('');
+  const [teamGenPrefix, setTeamGenPrefix] = useState('HABIT');
+  const [teamGenNote, setTeamGenNote] = useState('');
+  const [isSubmittingTeamGen, setIsSubmittingTeamGen] = useState(false);
 
   // ── Multi-Toast In-Web Notification Engine ──
   const [toasts, setToasts] = useState([]);
@@ -2671,12 +2692,13 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
       const res = await fetch(`/api/v1/teams/joined/apps/${appId}/users`, { headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
-        setTeamAppScope({
+        setTeamAppScope(prev => ({
+          ...prev,
           appId,
-          appName: data.app_name || appName,
+          appName: data.app_name || appName || prev?.appName,
           users: data.users || [],
           activeTab: 'users'
-        });
+        }));
       } else {
         showToast(data.message);
       }
@@ -2690,17 +2712,356 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
       const res = await fetch(`/api/v1/teams/joined/apps/${appId}/licenses`, { headers: getHeaders() });
       const data = await res.json();
       if (data.success) {
-        setTeamAppScope({
+        setTeamAppScope(prev => ({
+          ...prev,
           appId,
-          appName: data.app_name || appName,
+          appName: data.app_name || appName || prev?.appName,
           licenses: data.licenses || [],
           activeTab: 'licenses'
-        });
+        }));
       } else {
         showToast(data.message);
       }
     } catch (e) {
       showToast('Error loading team licenses: ' + e.message);
+    }
+  };
+
+  const handleOpenTeamAppRadar = async (appId, appName) => {
+    try {
+      const res = await fetch(`/api/v1/apps/${appId}/live-users`, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setTeamAppScope(prev => ({
+          ...prev,
+          appId,
+          appName: appName || prev?.appName,
+          radarUsers: data.users || [],
+          radarOnlineCount: data.online_count || 0,
+          radarKilledCount: data.killed_count || 0,
+          activeTab: 'radar'
+        }));
+      } else {
+        showToast(data.message);
+      }
+    } catch (e) {
+      showToast('Error loading team live radar: ' + e.message);
+    }
+  };
+
+  // Real-time auto-refresh when active in Team Live Radar
+  useEffect(() => {
+    if (activeNav === 'team-dashboard' && teamAppScope && teamAppScope.activeTab === 'radar') {
+      const timer = setInterval(() => {
+        fetch(`/api/v1/apps/${teamAppScope.appId}/live-users`, { headers: getHeaders() })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              setTeamAppScope(prev => prev && prev.appId === teamAppScope.appId ? {
+                ...prev,
+                radarUsers: data.users || [],
+                radarOnlineCount: data.online_count || 0,
+                radarKilledCount: data.killed_count || 0
+              } : prev);
+            }
+          })
+          .catch(() => {});
+      }, 3500);
+      return () => clearInterval(timer);
+    }
+  }, [activeNav, teamAppScope?.appId, teamAppScope?.activeTab]);
+
+  // Team User Actions
+  const handleTeamResetUserHwid = async (user) => {
+    if (isMaintenanceLocked) { showToast('System Maintenance: Resetting HWID is locked.'); return; }
+    try {
+      const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/users/${user.id}/reset-hwid`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`HWID reset successfully for @${user.username}!`);
+        handleOpenTeamAppUsers(teamAppScope.appId, teamAppScope.appName);
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  };
+
+  const handleTeamToggleBanUser = (user) => {
+    const isBanning = user.status !== 'banned';
+    promptConfirm({
+      title: isBanning ? `Ban @${user.username}` : `Unban @${user.username}`,
+      message: isBanning 
+        ? `Are you sure you want to ban @${user.username} from application '${teamAppScope.appName}'?` 
+        : `Are you sure you want to unban @${user.username}?`,
+      confirmText: isBanning ? 'Ban User' : 'Unban User',
+      isDanger: isBanning,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/users/${user.id}/toggle-ban`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ reason: isBanning ? 'Policy violation (Team Admin)' : '' })
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message);
+            handleOpenTeamAppUsers(teamAppScope.appId, teamAppScope.appName);
+          } else {
+            showToast(data.message, 'error');
+          }
+        } catch (e) {
+          showToast(e.message, 'error');
+        }
+      }
+    });
+  };
+
+  const handleTeamUnlockUser = async (user) => {
+    try {
+      const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/users/${user.id}/unlock`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`User @${user.username} unlocked successfully!`);
+        handleOpenTeamAppUsers(teamAppScope.appId, teamAppScope.appName);
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  };
+
+  const handleTeamDeleteUser = (user) => {
+    promptConfirm({
+      title: `Delete User @${user.username}`,
+      message: `Are you sure you want to permanently delete user @${user.username} from '${teamAppScope.appName}'?`,
+      confirmText: 'Delete User',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/users/${user.id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message);
+            handleOpenTeamAppUsers(teamAppScope.appId, teamAppScope.appName);
+          } else {
+            showToast(data.message, 'error');
+          }
+        } catch (e) {
+          showToast(e.message, 'error');
+        }
+      }
+    });
+  };
+
+  // Team License Actions
+  const handleTeamRevokeLicense = async (lic) => {
+    try {
+      const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/licenses/${lic.id}/revoke`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message);
+        handleOpenTeamAppLicenses(teamAppScope.appId, teamAppScope.appName);
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  };
+
+  const handleTeamResetLicenseHwid = async (lic) => {
+    try {
+      const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/licenses/${lic.id}/reset-hwid`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Hardware profile reset on license!');
+        handleOpenTeamAppLicenses(teamAppScope.appId, teamAppScope.appName);
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  };
+
+  const handleTeamDeleteLicense = (lic) => {
+    promptConfirm({
+      title: 'Delete License Key',
+      message: `Are you sure you want to permanently delete license key '${lic.license_key}'?`,
+      confirmText: 'Delete License',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/licenses/${lic.id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message);
+            handleOpenTeamAppLicenses(teamAppScope.appId, teamAppScope.appName);
+          } else {
+            showToast(data.message, 'error');
+          }
+        } catch (e) {
+          showToast(e.message, 'error');
+        }
+      }
+    });
+  };
+
+  // Team Radar Actions
+  const handleTeamKillSession = (u) => {
+    promptConfirm({
+      title: `Remote Kill Session for @${u.username}`,
+      message: `Terminate active client connection for user @${u.username}? Immediate kill signal will be dispatched.`,
+      confirmText: 'Terminate Session',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/users/${u.id}/kill-session`, {
+            method: 'POST',
+            headers: getHeaders()
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message);
+            handleOpenTeamAppRadar(teamAppScope.appId, teamAppScope.appName);
+          } else {
+            showToast(data.message, 'error');
+          }
+        } catch (e) {
+          showToast(e.message, 'error');
+        }
+      }
+    });
+  };
+
+  const handleTeamReviveSession = async (u) => {
+    try {
+      const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/users/${u.id}/revive-session`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message);
+        handleOpenTeamAppRadar(teamAppScope.appId, teamAppScope.appName);
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  };
+
+  const handleTeamKillAllSessions = () => {
+    promptConfirm({
+      title: 'Emergency Killswitch: Terminate All',
+      message: `Emergency Killswitch will instantly terminate ALL currently active client sessions for '${teamAppScope.appName}'. Proceed?`,
+      confirmText: 'Kill All Active Sessions',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/kill-all-sessions`, {
+            method: 'POST',
+            headers: getHeaders()
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message);
+            handleOpenTeamAppRadar(teamAppScope.appId, teamAppScope.appName);
+          } else {
+            showToast(data.message, 'error');
+          }
+        } catch (e) {
+          showToast(e.message, 'error');
+        }
+      }
+    });
+  };
+
+  // Team Form Submit Handlers
+  const handleTeamAddUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!teamAppScope?.appId) return;
+    setIsSubmittingTeamUser(true);
+    try {
+      const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/users`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          username: teamNewUsername.trim(),
+          password: teamNewPassword.trim(),
+          license_key: teamNewLicense,
+          expiry_date: teamNewExpiry,
+          hwid_lock: teamNewHwidLock
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to add client user');
+      showToast(data.message);
+      setShowTeamAddUserModal(false);
+      setTeamNewUsername('');
+      setTeamNewPassword('');
+      setTeamNewLicense('MANUAL_BYPASS');
+      setTeamNewExpiry('');
+      setTeamNewHwidLock(false);
+      handleOpenTeamAppUsers(teamAppScope.appId, teamAppScope.appName);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setIsSubmittingTeamUser(false);
+    }
+  };
+
+  const handleTeamGenLicSubmit = async (e) => {
+    e.preventDefault();
+    if (!teamAppScope?.appId) return;
+    setIsSubmittingTeamGen(true);
+    const resolvedDuration = teamGenDuration === 'custom'
+      ? Math.max(parseInt(teamGenCustomDuration, 10) || 1, 1)
+      : parseInt(teamGenDuration, 10) || 0;
+    try {
+      const res = await fetch(`/api/v1/apps/${teamAppScope.appId}/licenses/generate`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          count: parseInt(teamGenCount, 10) || 1,
+          duration_days: resolvedDuration,
+          prefix: teamGenPrefix || 'HABIT',
+          note: teamGenNote || ''
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to generate licenses');
+      showToast(data.message);
+      setShowTeamGenLicModal(false);
+      setTeamGenCount(1);
+      setTeamGenNote('');
+      handleOpenTeamAppLicenses(teamAppScope.appId, teamAppScope.appName);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setIsSubmittingTeamGen(false);
     }
   };
 
@@ -3565,7 +3926,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               }}
             /> 
             <span>Live Radar</span>
-            {isFreePlan ? (
+            {isFreePlan && !(joinedTeam && (joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics)) ? (
               <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }} title="Developer & Pro Feature">
                 <Crown size={14} color="#f59e0b" fill="#f59e0b" />
               </span>
@@ -5420,7 +5781,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
         {/* ── 3.5 LIVE ONLINE RADAR TAB (REAL-TIME TELEMETRY & INSTANT KILL) ───────── */}
         {activeNav === 'radar' && (
           <div className="animate-slide-up">
-            {isFreePlan ? (
+            {isFreePlan && !(joinedTeam && (joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics)) ? (
               <div className="users-empty" style={{ padding: '60px 20px', maxWidth: '640px', margin: '40px auto', border: '1px solid rgba(245, 158, 11, 0.35)', background: 'rgba(245, 158, 11, 0.04)' }}>
                 <div style={{
                   width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)',
@@ -5660,10 +6021,10 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   <Laptop size={15} color="#94a3b8" />
                 </div>
                 <div style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {radarSelectedApp === 'all' ? 'All Applications' : (apps.find(a => a.id === radarSelectedApp)?.app_name || 'Selected App')}
+                  {radarSelectedApp === 'all' ? 'All Applications' : (apps.find(a => a.id === radarSelectedApp)?.app_name || joinedTeam?.apps?.find(a => a.id === radarSelectedApp)?.app_name || 'Selected App')}
                 </div>
                 <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px', fontWeight: 500 }}>
-                  {apps.length} configured desktop apps
+                  {(apps.length + (joinedTeam?.apps?.length || 0))} configured desktop apps
                 </div>
               </div>
             </div>
@@ -5798,6 +6159,15 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                         {app.app_name} (v{app.version || '1.0.0'})
                       </option>
                     ))}
+                    {joinedTeam?.apps && joinedTeam.apps.length > 0 && (
+                      <optgroup label={`Team: ${joinedTeam.team_name || 'Team Applications'}`} style={{ background: '#141620', color: '#94a3b8' }}>
+                        {joinedTeam.apps.map(app => (
+                          <option key={`team-${app.id}`} value={app.id} style={{ background: '#141620', color: '#ffffff', padding: '10px' }}>
+                            {app.app_name} (Team App)
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                   <ChevronDown
                     size={14}
@@ -7763,19 +8133,26 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
             {/* Member Permissions Overview Panel */}
             <div className="glass-panel" style={{ padding: '22px 28px', marginBottom: '28px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 800, marginBottom: '10px' }}>Your Team Permissions</h3>
+              <div className="flex-between" style={{ flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 800 }}>Your Team Permissions</h3>
+                {joinedTeam.role === 'admin' && (
+                  <span className="badge badge-primary" style={{ fontWeight: 800, letterSpacing: '0.5px' }}>
+                    FULL OWNER-LEVEL ADMIN PRIVILEGES
+                  </span>
+                )}
+              </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                <span className={`badge ${joinedTeam.permissions.manage_users ? 'badge-active' : 'badge-danger'}`}>
-                  Manage Users: {joinedTeam.permissions.manage_users ? 'ALLOWED' : 'RESTRICTED'}
+                <span className={`badge ${(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_users) ? 'badge-active' : 'badge-danger'}`}>
+                  Manage Users: {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_users) ? 'ALLOWED' : 'RESTRICTED'}
                 </span>
-                <span className={`badge ${joinedTeam.permissions.manage_licenses ? 'badge-active' : 'badge-danger'}`}>
-                  Manage Licenses: {joinedTeam.permissions.manage_licenses ? 'ALLOWED' : 'RESTRICTED'}
+                <span className={`badge ${(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_licenses) ? 'badge-active' : 'badge-danger'}`}>
+                  Manage Licenses: {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_licenses) ? 'ALLOWED' : 'RESTRICTED'}
                 </span>
-                <span className={`badge ${joinedTeam.permissions.view_analytics ? 'badge-active' : 'badge-danger'}`}>
-                  View Analytics: {joinedTeam.permissions.view_analytics ? 'ALLOWED' : 'RESTRICTED'}
+                <span className={`badge ${(joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics) ? 'badge-active' : 'badge-danger'}`}>
+                  Live Radar & Analytics: {(joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics) ? 'ALLOWED' : 'RESTRICTED'}
                 </span>
-                <span className={`badge ${joinedTeam.permissions.manage_webhooks ? 'badge-active' : 'badge-danger'}`}>
-                  Webhooks: {joinedTeam.permissions.manage_webhooks ? 'ALLOWED' : 'RESTRICTED'}
+                <span className={`badge ${(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_webhooks) ? 'badge-active' : 'badge-danger'}`}>
+                  Webhooks: {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_webhooks) ? 'ALLOWED' : 'RESTRICTED'}
                 </span>
               </div>
             </div>
@@ -7790,7 +8167,11 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                     </button>
                     <div>
                       <h3 style={{ fontSize: '18px', fontWeight: 800 }}>
-                        {teamAppScope.appName} — {teamAppScope.activeTab === 'users' ? 'Users Directory' : 'Licenses Directory'}
+                        {teamAppScope.appName} — {
+                          teamAppScope.activeTab === 'users' ? 'Users Directory' : 
+                          teamAppScope.activeTab === 'licenses' ? 'Licenses Directory' : 
+                          'Live Online Radar'
+                        }
                       </h3>
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>App ID: {teamAppScope.appId}</span>
                     </div>
@@ -7801,7 +8182,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                       onClick={() => handleOpenTeamAppUsers(teamAppScope.appId, teamAppScope.appName)}
                       className={`btn ${teamAppScope.activeTab === 'users' ? 'btn-primary' : 'btn-secondary'}`}
                       style={{ padding: '8px 14px', fontSize: '12px' }}
-                      disabled={!joinedTeam.permissions.manage_users}
+                      disabled={!joinedTeam.permissions?.manage_users && joinedTeam.role !== 'admin'}
                     >
                       Users ({teamAppScope.users?.length || 0})
                     </button>
@@ -7809,78 +8190,449 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                       onClick={() => handleOpenTeamAppLicenses(teamAppScope.appId, teamAppScope.appName)}
                       className={`btn ${teamAppScope.activeTab === 'licenses' ? 'btn-primary' : 'btn-secondary'}`}
                       style={{ padding: '8px 14px', fontSize: '12px' }}
-                      disabled={!joinedTeam.permissions.manage_licenses}
+                      disabled={!joinedTeam.permissions?.manage_licenses && joinedTeam.role !== 'admin'}
                     >
                       Licenses ({teamAppScope.licenses?.length || 0})
                     </button>
+                    {(joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics) && (
+                      <button 
+                        onClick={() => handleOpenTeamAppRadar(teamAppScope.appId, teamAppScope.appName)}
+                        className={`btn ${teamAppScope.activeTab === 'radar' ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ 
+                          padding: '8px 14px', 
+                          fontSize: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          borderColor: teamAppScope.activeTab === 'radar' ? 'var(--primary)' : 'rgba(16, 185, 129, 0.4)',
+                          color: teamAppScope.activeTab === 'radar' ? '#fff' : '#10b981'
+                        }}
+                      >
+                        <Radio size={13} />
+                        Live Radar ({teamAppScope.radarUsers?.filter(u => !u.is_killed).length || 0})
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {teamAppScope.activeTab === 'users' ? (
-                  <div className="table-wrapper">
-                    <table className="custom-table">
-                      <thead>
-                        <tr>
-                          <th>Username</th>
-                          <th>Hardware ID (HWID)</th>
-                          <th>Status</th>
-                          <th>Expiration</th>
-                          <th>Registered</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(!teamAppScope.users || teamAppScope.users.length === 0) ? (
-                          <tr><td colSpan="5" style={{ textAlign: 'center', padding: '28px', color: 'var(--text-muted)' }}>No client users registered under this application yet.</td></tr>
-                        ) : (
-                          teamAppScope.users.map(u => (
-                            <tr key={u.id}>
-                              <td style={{ fontWeight: 800 }}>@{u.username}</td>
-                              <td className="mono-text" style={{ fontSize: '11px' }}>{u.hwid ? `${u.hwid.slice(0, 16)}...` : 'Not bound'}</td>
-                              <td>
-                                <span className={`badge ${u.status === 'active' ? 'badge-active' : 'badge-danger'}`}>
-                                  {u.status?.toUpperCase()}
-                                </span>
-                              </td>
-                              <td>{u.expires_at === 0 ? 'Lifetime' : new Date(u.expires_at * 1000).toLocaleDateString()}</td>
-                              <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(u.created_at * 1000).toLocaleDateString()}</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                {/* 1. USERS TAB */}
+                {teamAppScope.activeTab === 'users' && (
+                  <div className="animate-fade-in">
+                    <div className="flex-between" style={{ marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ position: 'relative', width: '280px', maxWidth: '100%' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input 
+                          type="text"
+                          className="form-input"
+                          placeholder="Search user, HWID or IP..."
+                          value={teamUserSearch}
+                          onChange={(e) => setTeamUserSearch(e.target.value)}
+                          style={{ paddingLeft: '34px', fontSize: '13px', height: '38px' }}
+                        />
+                      </div>
+
+                      {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_users) && (
+                        <button 
+                          className="btn btn-primary"
+                          onClick={() => {
+                            setTeamNewUsername('');
+                            setTeamNewPassword('');
+                            setTeamNewLicense('MANUAL_BYPASS');
+                            setTeamNewExpiry('');
+                            setTeamNewHwidLock(false);
+                            setShowTeamAddUserModal(true);
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px' }}
+                        >
+                          <UserPlus size={15} /> Add User
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="table-wrapper">
+                      <table className="custom-table">
+                        <thead>
+                          <tr>
+                            <th>Username</th>
+                            <th>Hardware ID (HWID)</th>
+                            <th>Status</th>
+                            <th>Expiration</th>
+                            <th>Registered</th>
+                            {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_users) && (
+                              <th style={{ textAlign: 'right' }}>Actions</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            const filteredUsers = (teamAppScope.users || []).filter(u => {
+                              if (!teamUserSearch.trim()) return true;
+                              const q = teamUserSearch.toLowerCase();
+                              return u.username?.toLowerCase().includes(q) || u.hwid?.toLowerCase().includes(q) || u.last_ip?.toLowerCase().includes(q);
+                            });
+
+                            if (filteredUsers.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan={(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_users) ? 6 : 5} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                                    {teamUserSearch.trim() ? 'No users matching search query.' : 'No client users registered under this application yet.'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return filteredUsers.map(u => (
+                              <tr key={u.id}>
+                                <td style={{ fontWeight: 800 }}>
+                                  <span style={{ color: 'var(--primary-light)' }}>@{u.username}</span>
+                                  {u.is_online === 1 && (
+                                    <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', marginLeft: '6px' }} title="Online Now" />
+                                  )}
+                                </td>
+                                <td className="mono-text" style={{ fontSize: '11px' }}>
+                                  {u.hwid ? (
+                                    <span className="flex-align" style={{ gap: '6px' }}>
+                                      {u.hwid.slice(0, 16)}...
+                                      <button 
+                                        className="icon-btn-sm" 
+                                        onClick={() => { navigator.clipboard.writeText(u.hwid); showToast('HWID copied to clipboard!'); }}
+                                        title="Copy full HWID"
+                                      >
+                                        <Copy size={12} />
+                                      </button>
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-muted)' }}>Not bound</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <span className={`badge ${u.status === 'active' ? 'badge-active' : u.status === 'locked' ? 'badge-warning' : 'badge-danger'}`}>
+                                    {u.status?.toUpperCase()}
+                                  </span>
+                                </td>
+                                <td>{u.expires_at === 0 ? 'Lifetime' : new Date(u.expires_at * 1000).toLocaleDateString()}</td>
+                                <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(u.created_at * 1000).toLocaleDateString()}</td>
+                                {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_users) && (
+                                  <td style={{ textAlign: 'right' }}>
+                                    <div className="flex-align" style={{ justifyContent: 'flex-end', gap: '6px' }}>
+                                      <button 
+                                        className="icon-btn-sm"
+                                        onClick={() => handleTeamResetUserHwid(u)}
+                                        title="Reset Hardware ID (HWID)"
+                                        style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.2)' }}
+                                      >
+                                        <Key size={13} />
+                                      </button>
+
+                                      <button 
+                                        className="icon-btn-sm"
+                                        onClick={() => handleTeamToggleBanUser(u)}
+                                        title={u.status === 'banned' ? 'Unban User' : 'Ban User'}
+                                        style={{ 
+                                          color: u.status === 'banned' ? '#10b981' : '#ef4444', 
+                                          background: u.status === 'banned' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                          borderColor: u.status === 'banned' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'
+                                        }}
+                                      >
+                                        <Ban size={13} />
+                                      </button>
+
+                                      {u.status === 'locked' && (
+                                        <button 
+                                          className="icon-btn-sm"
+                                          onClick={() => handleTeamUnlockUser(u)}
+                                          title="Unlock User"
+                                          style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.2)' }}
+                                        >
+                                          <Unlock size={13} />
+                                        </button>
+                                      )}
+
+                                      <button 
+                                        className="icon-btn-sm"
+                                        onClick={() => handleTeamDeleteUser(u)}
+                                        title="Delete User"
+                                        style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                )}
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                ) : (
-                  <div className="table-wrapper">
-                    <table className="custom-table">
-                      <thead>
-                        <tr>
-                          <th>License Key</th>
-                          <th>Duration</th>
-                          <th>Bound User</th>
-                          <th>Status</th>
-                          <th>Created</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(!teamAppScope.licenses || teamAppScope.licenses.length === 0) ? (
-                          <tr><td colSpan="5" style={{ textAlign: 'center', padding: '28px', color: 'var(--text-muted)' }}>No licenses generated for this app yet.</td></tr>
-                        ) : (
-                          teamAppScope.licenses.map(lic => (
-                            <tr key={lic.id}>
-                              <td className="mono-text" style={{ fontWeight: 800, color: 'var(--primary-light)' }}>{lic.license_key}</td>
-                              <td>{lic.duration_days === 0 ? 'Lifetime' : `${lic.duration_days} Days`}</td>
-                              <td>{lic.bound_username ? `@${lic.bound_username}` : <span style={{ color: 'var(--text-muted)' }}>Unused</span>}</td>
-                              <td>
-                                <span className={`badge ${lic.status === 'active' ? 'badge-active' : lic.status === 'unused' ? 'badge-primary' : 'badge-danger'}`}>
-                                  {lic.status?.toUpperCase()}
-                                </span>
-                              </td>
-                              <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(lic.created_at * 1000).toLocaleDateString()}</td>
-                            </tr>
-                          ))
+                )}
+
+                {/* 2. LICENSES TAB */}
+                {teamAppScope.activeTab === 'licenses' && (
+                  <div className="animate-fade-in">
+                    <div className="flex-between" style={{ marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ position: 'relative', width: '280px', maxWidth: '100%' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input 
+                          type="text"
+                          className="form-input"
+                          placeholder="Search license key or user..."
+                          value={teamLicSearch}
+                          onChange={(e) => setTeamLicSearch(e.target.value)}
+                          style={{ paddingLeft: '34px', fontSize: '13px', height: '38px' }}
+                        />
+                      </div>
+
+                      {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_licenses) && (
+                        <button 
+                          className="btn btn-primary"
+                          onClick={() => {
+                            setTeamGenCount(1);
+                            setTeamGenDuration('30');
+                            setTeamGenCustomDuration('');
+                            setTeamGenPrefix('HABIT');
+                            setTeamGenNote('');
+                            setShowTeamGenLicModal(true);
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px' }}
+                        >
+                          <Key size={15} /> Generate License
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="table-wrapper">
+                      <table className="custom-table">
+                        <thead>
+                          <tr>
+                            <th>License Key</th>
+                            <th>Duration</th>
+                            <th>Bound User</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_licenses) && (
+                              <th style={{ textAlign: 'right' }}>Actions</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            const filteredLicenses = (teamAppScope.licenses || []).filter(lic => {
+                              if (!teamLicSearch.trim()) return true;
+                              const q = teamLicSearch.toLowerCase();
+                              return lic.license_key?.toLowerCase().includes(q) || lic.bound_username?.toLowerCase().includes(q) || lic.note?.toLowerCase().includes(q);
+                            });
+
+                            if (filteredLicenses.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan={(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_licenses) ? 6 : 5} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                                    {teamLicSearch.trim() ? 'No licenses matching search query.' : 'No licenses generated for this app yet.'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return filteredLicenses.map(lic => (
+                              <tr key={lic.id}>
+                                <td className="mono-text" style={{ fontWeight: 800, color: 'var(--primary-light)' }}>
+                                  <span className="flex-align" style={{ gap: '6px' }}>
+                                    {lic.license_key}
+                                    <button 
+                                      className="icon-btn-sm" 
+                                      onClick={() => { navigator.clipboard.writeText(lic.license_key); showToast('License key copied!'); }}
+                                      title="Copy Key"
+                                    >
+                                      <Copy size={12} />
+                                    </button>
+                                  </span>
+                                </td>
+                                <td>{lic.duration_days === 0 ? 'Lifetime' : `${lic.duration_days} Days`}</td>
+                                <td>{lic.bound_username ? `@${lic.bound_username}` : <span style={{ color: 'var(--text-muted)' }}>Unused</span>}</td>
+                                <td>
+                                  <span className={`badge ${lic.status === 'active' ? 'badge-active' : lic.status === 'unused' ? 'badge-primary' : 'badge-danger'}`}>
+                                    {lic.status?.toUpperCase()}
+                                  </span>
+                                </td>
+                                <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(lic.created_at * 1000).toLocaleDateString()}</td>
+                                {(joinedTeam.role === 'admin' || joinedTeam.permissions?.manage_licenses) && (
+                                  <td style={{ textAlign: 'right' }}>
+                                    <div className="flex-align" style={{ justifyContent: 'flex-end', gap: '6px' }}>
+                                      <button 
+                                        className="icon-btn-sm"
+                                        onClick={() => handleTeamResetLicenseHwid(lic)}
+                                        title="Reset License HWID"
+                                        style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.2)' }}
+                                      >
+                                        <Key size={13} />
+                                      </button>
+
+                                      <button 
+                                        className="icon-btn-sm"
+                                        onClick={() => handleTeamRevokeLicense(lic)}
+                                        title={lic.status === 'revoked' ? 'Restore License' : 'Revoke License'}
+                                        style={{ 
+                                          color: lic.status === 'revoked' ? '#10b981' : '#ef4444', 
+                                          background: lic.status === 'revoked' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                          borderColor: lic.status === 'revoked' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'
+                                        }}
+                                      >
+                                        <Ban size={13} />
+                                      </button>
+
+                                      <button 
+                                        className="icon-btn-sm"
+                                        onClick={() => handleTeamDeleteLicense(lic)}
+                                        title="Delete License"
+                                        style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                )}
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. LIVE RADAR TAB */}
+                {teamAppScope.activeTab === 'radar' && (
+                  <div className="animate-fade-in">
+                    <div className="glass-panel" style={{ padding: '20px 24px', marginBottom: '20px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                      <div className="flex-align" style={{ gap: '24px', flexWrap: 'wrap' }}>
+                        <div className="flex-align" style={{ gap: '10px' }}>
+                          <div style={{ position: 'relative', width: '12px', height: '12px' }}>
+                            <span style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', background: '#10b981', opacity: 0.75 }} className="animate-ping" />
+                            <span style={{ position: 'relative', display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: '#10b981' }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Live Active Sessions</div>
+                            <div style={{ fontSize: '22px', fontWeight: 900, color: '#10b981' }}>
+                              {teamAppScope.radarUsers?.filter(u => !u.is_killed).length || 0}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex-align" style={{ gap: '10px' }}>
+                          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }} />
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Terminated Sessions</div>
+                            <div style={{ fontSize: '22px', fontWeight: 900, color: '#ef4444' }}>
+                              {teamAppScope.radarUsers?.filter(u => u.is_killed).length || 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-align" style={{ gap: '10px' }}>
+                        <button 
+                          className="btn btn-secondary" 
+                          onClick={() => handleOpenTeamAppRadar(teamAppScope.appId, teamAppScope.appName)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '12px' }}
+                        >
+                          <RefreshCw size={13} /> Refresh
+                        </button>
+
+                        {(joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics) && (
+                          <button 
+                            className="btn btn-danger" 
+                            onClick={handleTeamKillAllSessions}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+                            title="Terminate all currently connected sessions"
+                          >
+                            <ShieldAlert size={14} /> Kill All Sessions
+                          </button>
                         )}
-                      </tbody>
-                    </table>
+                      </div>
+                    </div>
+
+                    <div className="table-wrapper">
+                      <table className="custom-table">
+                        <thead>
+                          <tr>
+                            <th>User</th>
+                            <th>Status</th>
+                            <th>Ping / Heartbeat</th>
+                            <th>Hardware ID (HWID)</th>
+                            <th>IP Address</th>
+                            <th>Version</th>
+                            {(joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics) && (
+                              <th style={{ textAlign: 'right' }}>Remote Killswitch</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(!teamAppScope.radarUsers || teamAppScope.radarUsers.length === 0) ? (
+                            <tr>
+                              <td colSpan={(joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics) ? 7 : 6} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                                No active client sessions connected to this application right now.
+                              </td>
+                            </tr>
+                          ) : (
+                            teamAppScope.radarUsers.map(u => (
+                              <tr key={u.id}>
+                                <td style={{ fontWeight: 800 }}>
+                                  <span style={{ color: 'var(--primary-light)' }}>@{u.username}</span>
+                                </td>
+                                <td>
+                                  <span className={`badge ${u.is_killed ? 'badge-danger' : 'badge-active'}`}>
+                                    {u.is_killed ? 'KILLED' : 'ONLINE'}
+                                  </span>
+                                </td>
+                                <td style={{ fontSize: '12px' }}>
+                                  {u.seconds_since_ping !== undefined ? `${u.seconds_since_ping}s ago` : 'Live'}
+                                </td>
+                                <td className="mono-text" style={{ fontSize: '11px' }}>
+                                  {u.hwid ? (
+                                    <span className="flex-align" style={{ gap: '6px' }}>
+                                      {u.hwid.slice(0, 16)}...
+                                      <button 
+                                        className="icon-btn-sm" 
+                                        onClick={() => { navigator.clipboard.writeText(u.hwid); showToast('HWID copied!'); }}
+                                        title="Copy HWID"
+                                      >
+                                        <Copy size={12} />
+                                      </button>
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-muted)' }}>Not bound</span>
+                                  )}
+                                </td>
+                                <td className="mono-text" style={{ fontSize: '12px' }}>{u.last_ip || '127.0.0.1'}</td>
+                                <td>v{u.app_version || '1.0.0'}</td>
+                                {(joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics) && (
+                                  <td style={{ textAlign: 'right' }}>
+                                    {u.is_killed ? (
+                                      <button 
+                                        className="btn btn-secondary"
+                                        onClick={() => handleTeamReviveSession(u)}
+                                        style={{ padding: '5px 12px', fontSize: '11px', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)', background: 'rgba(16, 185, 129, 0.08)' }}
+                                      >
+                                        Revive
+                                      </button>
+                                    ) : (
+                                      <button 
+                                        className="btn btn-danger"
+                                        onClick={() => handleTeamKillSession(u)}
+                                        style={{ padding: '5px 12px', fontSize: '11px', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.12)' }}
+                                      >
+                                        Kill Session
+                                      </button>
+                                    )}
+                                  </td>
+                                )}
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -7924,20 +8676,31 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                           <button 
                             className="user-action-btn edit" 
                             onClick={() => handleOpenTeamAppUsers(app.id, app.app_name)}
-                            disabled={!joinedTeam.permissions.manage_users}
-                            title={joinedTeam.permissions.manage_users ? 'Manage application users' : 'Permission required'}
+                            disabled={!joinedTeam.permissions?.manage_users && joinedTeam.role !== 'admin'}
+                            title={(joinedTeam.permissions?.manage_users || joinedTeam.role === 'admin') ? 'Manage application users' : 'Permission required'}
                           >
-                            {joinedTeam.permissions.manage_users ? 'Open Users' : 'Users Restricted'}
+                            {(joinedTeam.permissions?.manage_users || joinedTeam.role === 'admin') ? 'Users' : 'Users Restricted'}
                           </button>
 
                           <button 
                             className="user-action-btn hwid" 
                             onClick={() => handleOpenTeamAppLicenses(app.id, app.app_name)}
-                            disabled={!joinedTeam.permissions.manage_licenses}
-                            title={joinedTeam.permissions.manage_licenses ? 'Manage licenses' : 'Permission required'}
+                            disabled={!joinedTeam.permissions?.manage_licenses && joinedTeam.role !== 'admin'}
+                            title={(joinedTeam.permissions?.manage_licenses || joinedTeam.role === 'admin') ? 'Manage licenses' : 'Permission required'}
                           >
-                            {joinedTeam.permissions.manage_licenses ? 'Open Licenses' : 'Licenses Restricted'}
+                            {(joinedTeam.permissions?.manage_licenses || joinedTeam.role === 'admin') ? 'Licenses' : 'Licenses Restricted'}
                           </button>
+
+                          {(joinedTeam.role === 'admin' || joinedTeam.permissions?.view_analytics) && (
+                            <button 
+                              className="user-action-btn ban" 
+                              style={{ borderColor: 'rgba(16, 185, 129, 0.4)', color: '#10b981', background: 'rgba(16, 185, 129, 0.08)' }}
+                              onClick={() => handleOpenTeamAppRadar(app.id, app.app_name)}
+                              title="Open Live Online Radar"
+                            >
+                              Live Radar
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -12173,6 +12936,210 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
               <div className="flex-align" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
                 <button type="button" onClick={() => setShowCreateTeamModal(false)} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary">Create Team</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4B. TEAM ADD USER MODAL */}
+      {showTeamAddUserModal && teamAppScope && (
+        <div className="modal-overlay animate-scale-in">
+          <div className="modal-content glass-panel">
+            <div className="flex-between" style={{ marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 800 }} className="flex-align">
+                <UserPlus size={20} color="var(--primary)" style={{ marginRight: '8px' }} />
+                Add User ({teamAppScope.appName})
+              </h3>
+              <button className="icon-btn" onClick={() => { setShowTeamAddUserModal(false); setTeamNewHwidLock(false); }}><X size={16} /></button>
+            </div>
+
+            <form onSubmit={handleTeamAddUserSubmit}>
+              <div className="form-group">
+                <label className="form-label">Application</label>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={`${teamAppScope.appName} (${teamAppScope.appId})`} 
+                  className="form-input mono-text" 
+                  style={{ opacity: 0.8 }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Username</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. team_client_user" 
+                  value={teamNewUsername}
+                  onChange={(e) => setTeamNewUsername(e.target.value)}
+                  className="form-input" 
+                  autoFocus
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Password</label>
+                <input 
+                  type="password" 
+                  required 
+                  placeholder="••••••••••••" 
+                  value={teamNewPassword}
+                  onChange={(e) => setTeamNewPassword(e.target.value)}
+                  className="form-input" 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Redeem License Key (Optional)</label>
+                <select 
+                  className="form-select"
+                  value={teamNewLicense}
+                  onChange={(e) => setTeamNewLicense(e.target.value)}
+                >
+                  <option value="MANUAL_BYPASS">No License (Manual Expiry)</option>
+                  {(teamAppScope.licenses || []).filter(lic => lic.status === 'unused').map(lic => (
+                    <option key={lic.id} value={lic.license_key}>
+                      {lic.license_key} ({lic.duration_days === 0 ? 'Lifetime' : `${lic.duration_days}d`})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {teamNewLicense === 'MANUAL_BYPASS' && (
+                <div className="form-group animate-slide-up">
+                  <label className="form-label">Manual Expiration Date</label>
+                  <input 
+                    type="date" 
+                    value={teamNewExpiry}
+                    onChange={(e) => setTeamNewExpiry(e.target.value)}
+                    className="form-input" 
+                  />
+                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                    Leave blank for lifetime / permanent access.
+                  </span>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={teamNewHwidLock}
+                    onChange={(e) => setTeamNewHwidLock(e.target.checked)}
+                    style={{ accentColor: 'var(--primary)', width: '16px', height: '16px' }}
+                  />
+                  <span>Lock to first logged-in HWID</span>
+                </label>
+              </div>
+
+              <div className="flex-align" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
+                <button type="button" onClick={() => setShowTeamAddUserModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={isSubmittingTeamUser}>
+                  {isSubmittingTeamUser ? 'Adding...' : 'Add User Profile'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4C. TEAM GENERATE LICENSES MODAL */}
+      {showTeamGenLicModal && teamAppScope && (
+        <div className="modal-overlay animate-scale-in">
+          <div className="modal-content glass-panel">
+            <div className="flex-between" style={{ marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 800 }} className="flex-align">
+                <Key size={20} color="var(--primary)" style={{ marginRight: '8px' }} />
+                Generate License Keys ({teamAppScope.appName})
+              </h3>
+              <button className="icon-btn" onClick={() => setShowTeamGenLicModal(false)}><X size={16} /></button>
+            </div>
+
+            <form onSubmit={handleTeamGenLicSubmit}>
+              <div className="form-group">
+                <label className="form-label">Application</label>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={`${teamAppScope.appName} (${teamAppScope.appId})`} 
+                  className="form-input mono-text" 
+                  style={{ opacity: 0.8 }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Quantity</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="100"
+                  value={teamGenCount} 
+                  onChange={(e) => setTeamGenCount(e.target.value)} 
+                  className="form-input" 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Duration</label>
+                <select 
+                  className="form-select"
+                  value={teamGenDuration}
+                  onChange={(e) => setTeamGenDuration(e.target.value)}
+                >
+                  <option value="0">Lifetime (No Expiration)</option>
+                  <option value="1">1 Day</option>
+                  <option value="7">7 Days</option>
+                  <option value="30">30 Days</option>
+                  <option value="365">365 Days (1 Year)</option>
+                  <option value="custom">Custom Duration (Enter Days)</option>
+                </select>
+              </div>
+
+              {teamGenDuration === 'custom' && (
+                <div className="form-group animate-slide-up">
+                  <label className="form-label">Enter Custom Days</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    placeholder="e.g. 14" 
+                    value={teamGenCustomDuration}
+                    onChange={(e) => setTeamGenCustomDuration(e.target.value)}
+                    className="form-input" 
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="form-label">Key Prefix</label>
+                <input 
+                  type="text" 
+                  placeholder="HABIT" 
+                  value={teamGenPrefix}
+                  onChange={(e) => setTeamGenPrefix(e.target.value.toUpperCase())}
+                  className="form-input mono-text" 
+                  maxLength={10}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Administrative Note (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Reseller batch / VIP customer" 
+                  value={teamGenNote}
+                  onChange={(e) => setTeamGenNote(e.target.value)}
+                  className="form-input" 
+                />
+              </div>
+
+              <div className="flex-align" style={{ justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
+                <button type="button" onClick={() => setShowTeamGenLicModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={isSubmittingTeamGen}>
+                  {isSubmittingTeamGen ? 'Generating...' : 'Generate Keys'}
+                </button>
               </div>
             </form>
           </div>
