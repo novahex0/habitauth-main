@@ -1,5 +1,6 @@
 import { db } from '../config/db.js';
 import { v4 as uuidv4 } from 'uuid';
+import { syncNow } from '../services/cloudSyncService.js';
 
 /**
  * Reads dynamic pricing, gateway details, and webhook URL from system_settings with default fallbacks
@@ -679,6 +680,9 @@ export async function reviewOrder(req, res) {
       try {
         db.prepare('UPDATE teams SET max_members = ? WHERE owner_id = ?').run(targetCapacity, order.user_id);
       } catch (e) {}
+
+      // Immediately push critical subscription update to Turso Cloud
+      syncNow(['subscriptions', 'crypto_payments', 'teams']);
 
       // 4. In-App Notification for User
       try {

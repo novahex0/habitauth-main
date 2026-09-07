@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
+import { v4 as uuidv4 } from 'uuid';
+import { scheduleSync } from '../services/cloudSyncService.js';
 
 export const getJwtSecret = () => {
   if (!process.env.JWT_SECRET) {
@@ -56,6 +58,21 @@ export function authenticateUser(req, res, next) {
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'User account not found.' });
+    }
+
+    if (!user.plan) {
+      const defaultPlan = (user.role === 'admin' || user.role === 'owner') ? 'pro' : 'free';
+      const subId = `sub_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
+      try {
+        db.prepare(`
+          INSERT OR REPLACE INTO subscriptions (id, user_id, plan, status, started_at, expires_at, provider, created_at)
+          VALUES (?, ?, ?, 'active', ?, 0, 'system', ?)
+        `).run(subId, user.id, defaultPlan, now, now);
+        user.plan = defaultPlan;
+        user.sub_status = 'active';
+        user.sub_expires_at = 0;
+        scheduleSync('subscriptions');
+      } catch (e) {}
     }
 
     if ((user.plan === 'developer' || user.plan === 'pro') && user.sub_expires_at > 0 && user.sub_expires_at < now) {

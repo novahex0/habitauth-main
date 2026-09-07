@@ -256,10 +256,30 @@ let syncTimeout = null;
 const dirtyTables = new Set();
 
 /**
+ * Immediate non-debounced sync for critical operations (e.g. subscription changes, payments).
+ */
+export async function syncNow(tableName = null) {
+  if (tableName) {
+    if (Array.isArray(tableName)) tableName.forEach(t => dirtyTables.add(t));
+    else dirtyTables.add(tableName);
+  }
+  try {
+    const tablesToSync = dirtyTables.size > 0 ? Array.from(dirtyTables) : SYNC_TABLES;
+    dirtyTables.clear();
+    await pushToCloud(tablesToSync);
+  } catch (err) {
+    console.error('[CloudSync] Immediate sync error:', err.message);
+  }
+}
+
+/**
  * Non-blocking debounced sync trigger. Called after any write operation.
  */
 export function scheduleSync(tableName = null) {
-  if (tableName) dirtyTables.add(tableName);
+  if (tableName) {
+    if (Array.isArray(tableName)) tableName.forEach(t => dirtyTables.add(t));
+    else dirtyTables.add(tableName);
+  }
   if (syncTimeout) clearTimeout(syncTimeout);
 
   syncTimeout = setTimeout(async () => {
@@ -270,7 +290,7 @@ export function scheduleSync(tableName = null) {
     } catch (err) {
       console.error('[CloudSync] Scheduled sync error:', err.message);
     }
-  }, 2000);
+  }, 1000);
 }
 
 /**

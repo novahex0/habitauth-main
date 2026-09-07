@@ -1,6 +1,7 @@
 import { getUserRetentionStatus, executeUserLogPurge, simulateUserCycleDay } from '../services/logRetentionService.js';
 import db from '../config/db.js';
 import { recordAuditLog, sendInAppNotification } from '../middleware/helpers.js';
+import { syncNow, scheduleSync } from '../services/cloudSyncService.js';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
@@ -138,6 +139,9 @@ export function updateAccountPlan(req, res) {
   try {
     db.prepare('UPDATE teams SET max_members = ? WHERE owner_id = ?').run(targetCapacity, accountId);
   } catch (e) {}
+
+  // Immediately push critical subscription update to Turso Cloud
+  syncNow(['subscriptions', 'teams']);
 
   const expiryMsg = expiresAt > 0 
     ? `Expires: ${new Date(expiresAt * 1000).toLocaleDateString()} (${durationLabel})`

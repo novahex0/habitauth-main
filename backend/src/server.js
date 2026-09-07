@@ -16,12 +16,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Initialize Database & Seed Development Data
+// Initialize Database & Restore persistent data from Turso Cloud on boot
 initDatabase();
-seedDatabase();
-
-// Restore persistent data from Turso Cloud on boot & start background sync
 await restoreFromCloud();
+seedDatabase();
 startPeriodicSync(60000);
 
 // ── SECURITY: Remove Express fingerprint header ───────────────
