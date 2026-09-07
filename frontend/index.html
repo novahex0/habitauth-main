@@ -4,13 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+  <!-- Google Search Site Name & Identity -->
+  <meta name="application-name" content="Habit Auth" />
+  <meta name="apple-mobile-web-app-title" content="Habit Auth" />
+  <meta property="og:site_name" content="Habit Auth" />
+
   <!-- Google Search & Multi-Resolution Favicons -->
-  <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
-  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
-  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="icon" type="image/x-icon" href="https://habitauth.com/favicon.ico" sizes="any" />
+  <link rel="shortcut icon" type="image/x-icon" href="https://habitauth.com/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="48x48" href="https://habitauth.com/favicon-48x48.png" />
+  <link rel="icon" type="image/png" sizes="96x96" href="https://habitauth.com/favicon-96x96.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="https://habitauth.com/favicon-192x192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="https://habitauth.com/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
   
   <!-- Primary Meta Tags -->
@@ -48,7 +53,18 @@
   <meta name="twitter:image" content="https://habitauth.com/logo.png" />
   <meta name="twitter:image:alt" content="Habit Auth Official Logo" />
   
-  <!-- JSON-LD Structured Data Schema for Google Search Rich Results -->
+  <!-- 1. Google Search Official WebSite Structured Data (For Site Name Display) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Habit Auth",
+    "alternateName": ["HabitAuth", "Habit Auth Platform"],
+    "url": "https://habitauth.com/"
+  }
+  </script>
+
+  <!-- 2. Organization & Software Application Structured Data Schema -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -67,16 +83,6 @@
           "https://github.com/habitauth",
           "https://youtube.com/@habitauth"
         ]
-      },
-      {
-        "@type": "WebSite",
-        "@id": "https://habitauth.com/#website",
-        "url": "https://habitauth.com",
-        "name": "Habit Auth",
-        "publisher": {
-          "@id": "https://habitauth.com/#organization"
-        },
-        "description": "Enterprise software authentication, hardware licensing (HWID Lock), and anti-tamper security infrastructure."
       },
       {
         "@type": "SoftwareApplication",

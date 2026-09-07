@@ -103,17 +103,24 @@ app.all('/api/*', (req, res) => {
 // Serve Frontend Static Build
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 
-// Explicit Favicon & Robots endpoints with proper caching for search bots (Googlebot)
-app.get('/favicon.ico', (req, res) => {
-  res.setHeader('Cache-Control', 'public, max-age=86400');
-  res.sendFile(path.join(frontendDist, 'favicon.ico'));
-});
+// Explicit Favicon, Static Metadata & Robots endpoints with proper caching and CORS for search bots (Googlebot/Googlebot-Image)
+const serveStaticFile = (file, contentType, cacheControl = 'public, max-age=604800, immutable') => (req, res) => {
+  res.setHeader('Cache-Control', cacheControl);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (contentType) res.type(contentType);
+  res.sendFile(path.join(frontendDist, file));
+};
 
-app.get('/robots.txt', (req, res) => {
-  res.setHeader('Cache-Control', 'public, max-age=86400');
-  res.type('text/plain');
-  res.sendFile(path.join(frontendDist, 'robots.txt'));
-});
+app.get('/favicon.ico', serveStaticFile('favicon.ico', 'image/x-icon', 'public, max-age=86400'));
+app.get('/favicon-48x48.png', serveStaticFile('favicon-48x48.png', 'image/png'));
+app.get('/favicon-96x96.png', serveStaticFile('favicon-96x96.png', 'image/png'));
+app.get('/favicon-192x192.png', serveStaticFile('favicon-192x192.png', 'image/png'));
+app.get('/apple-touch-icon.png', serveStaticFile('apple-touch-icon.png', 'image/png'));
+app.get('/logo.png', serveStaticFile('logo.png', 'image/png'));
+app.get('/brand.png', serveStaticFile('brand.png', 'image/png'));
+app.get('/site.webmanifest', serveStaticFile('site.webmanifest', 'application/manifest+json'));
+app.get('/robots.txt', serveStaticFile('robots.txt', 'text/plain', 'public, max-age=86400'));
+app.get('/sitemap.xml', serveStaticFile('sitemap.xml', 'application/xml', 'public, max-age=86400'));
 
 app.use(express.static(frontendDist));
 
