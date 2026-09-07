@@ -57,6 +57,12 @@ export default function LoginModal({ isOpen, initialMode = 'signin', initialTab 
     setShowForgotNotice(false);
     setBannedInfo({ isBanned: false, reason: '' });
     setPendingPlan(null);
+    setUsername('');
+    setPassword('');
+    setRegEmail('');
+    setRegUsername('');
+    setRegPassword('');
+    setRegConfirmPassword('');
     onClose();
   };
 

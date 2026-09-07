@@ -162,6 +162,12 @@ router.get('/system/config', getSystemConfig); // Public maintenance & announcem
 router.get('/app/check-update/:appId', checkAppUpdate); // Auto-update check
 router.get('/app/info/:appId', getPublicAppInfo);
 
+// ── 8b. CLIENT IN-APP TICKETING (SDK) ──
+router.post('/client/tickets/create', clientCreateTicket);
+router.get('/client/tickets/list', clientListTickets);
+router.post('/client/tickets/list', clientListTickets);
+router.post('/client/tickets/reply', clientReplyTicket);
+
 // Direct Browser GET Request Protection: Return HTTP 405 Method Not Allowed
 const clientGetNotAllowed = (req, res) => {
   return res.status(405).json({
@@ -253,10 +259,6 @@ router.post('/tickets/:ticketId/messages', authenticateUser, addTicketMessage);
 router.put('/tickets/:ticketId/status', authenticateUser, updateTicketStatus);
 router.delete('/tickets/:ticketId', authenticateUser, deleteTicket);
 
-// ── 8b. CLIENT IN-APP TICKETING (SDK) ──
-router.post('/client/tickets/create', clientCreateTicket);
-router.get('/client/tickets/list', clientListTickets);
-router.post('/client/tickets/reply', clientReplyTicket);
 
 // ── 9. HARDWARE & IP BLACKLIST SYSTEM ────────────────────────
 router.get('/blacklists', authenticateUser, getBlacklists);

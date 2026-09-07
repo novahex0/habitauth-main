@@ -358,7 +358,8 @@ export function clientCreateTicket(req, res) {
 
 export function clientListTickets(req, res) {
   try {
-    const { token, license_key } = req.body;
+    const token = req.body?.token || req.query?.token;
+    const license_key = req.body?.license_key || req.query?.license_key;
     let username = null;
     let appId = null;
 
@@ -380,12 +381,35 @@ export function clientListTickets(req, res) {
       return res.status(401).json({ success: false, message: 'Invalid client authentication token.' });
     }
 
-    const tickets = db.prepare(`
-      SELECT id, title as subject, status, priority, created_at, updated_at
-      FROM tickets
-      WHERE (client_username = ? OR app_id = ?)
-      ORDER BY updated_at DESC LIMIT 50
-    `).all(username, appId);
+    let query = '';
+    let params = [];
+    if (appId && username) {
+      query = `
+        SELECT id, title as subject, status, priority, created_at, updated_at
+        FROM tickets
+        WHERE app_id = ? AND client_username = ?
+        ORDER BY updated_at DESC LIMIT 50
+      `;
+      params = [appId, username];
+    } else if (username) {
+      query = `
+        SELECT id, title as subject, status, priority, created_at, updated_at
+        FROM tickets
+        WHERE client_username = ?
+        ORDER BY updated_at DESC LIMIT 50
+      `;
+      params = [username];
+    } else {
+      query = `
+        SELECT id, title as subject, status, priority, created_at, updated_at
+        FROM tickets
+        WHERE app_id = ?
+        ORDER BY updated_at DESC LIMIT 50
+      `;
+      params = [appId];
+    }
+
+    const tickets = db.prepare(query).all(...params);
 
     res.json({ success: true, tickets });
   } catch (err) {
@@ -396,7 +420,7 @@ export function clientListTickets(req, res) {
 
 export function clientReplyTicket(req, res) {
   try {
-    const { ticketId, reply, token } = req.body;
+    const { ticketId, reply, token, license_key } = req.body;
     if (!ticketId || !reply || !reply.trim()) {
       return res.status(400).json({ success: false, message: 'Ticket ID and reply message are required.' });
     }
@@ -404,6 +428,14 @@ export function clientReplyTicket(req, res) {
     const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
     if (!ticket) {
       return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    // Validate ownership if token or license is provided
+    if (token) {
+      const appUser = db.prepare('SELECT app_id, username FROM application_users WHERE token = ?').get(token);
+      if (appUser && ticket.app_id && ticket.app_id !== appUser.app_id) {
+        return res.status(403).json({ success: false, message: 'Unauthorized access to this ticket.' });
+      }
     }
 
     const now = Math.floor(Date.now() / 1000);

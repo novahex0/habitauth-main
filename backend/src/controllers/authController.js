@@ -372,10 +372,15 @@ export async function registerAccount(req, res) {
       user: {
         id: newId,
         username: cleanUsername,
+        discord_id: placeholderDiscordId,
         email: cleanEmail,
         avatar,
         role: 'user',
-        plan: 'free'
+        plan: 'free',
+        sub_status: 'active',
+        sub_started_at: now,
+        sub_expires_at: 0,
+        has_password: true
       }
     });
   } catch (err) {
@@ -424,10 +429,15 @@ export async function loginAccount(req, res) {
       user: {
         id: account.id,
         username: account.username,
+        discord_id: account.discord_id,
         email: account.email,
         avatar: account.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png',
         role: account.role,
-        plan: sub?.plan || 'free'
+        plan: sub?.plan || 'free',
+        sub_status: sub?.status || 'active',
+        sub_started_at: sub?.started_at || 0,
+        sub_expires_at: sub?.expires_at || 0,
+        has_password: !!account.password_hash
       }
     });
   } catch (err) {

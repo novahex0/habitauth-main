@@ -9,10 +9,10 @@ export function getApplications(req, res) {
   const apps = db.prepare(`
     SELECT 
       a.id, a.app_name, a.version, a.status, a.created_at, a.updated_at,
-      (SELECT COUNT(*) FROM application_users WHERE app_id = a.id) as total_users,
-      (SELECT COUNT(*) FROM licenses WHERE app_id = a.id) as total_licenses,
-      (SELECT COUNT(*) FROM licenses WHERE app_id = a.id AND status = 'active') as active_licenses,
-      (SELECT COUNT(*) FROM webhook_deliveries wd JOIN webhooks w ON w.id = wd.webhook_id WHERE w.app_id = a.id) as api_requests
+      (SELECT COUNT(*) FROM application_users WHERE app_id = a.id OR app_id = a.app_name) as total_users,
+      (SELECT COUNT(*) FROM licenses WHERE app_id = a.id OR app_id = a.app_name) as total_licenses,
+      (SELECT COUNT(*) FROM licenses WHERE (app_id = a.id OR app_id = a.app_name) AND status = 'active') as active_licenses,
+      (SELECT COUNT(*) FROM webhook_deliveries wd JOIN webhooks w ON w.id = wd.webhook_id WHERE w.app_id = a.id OR w.app_id = a.app_name) as api_requests
     FROM applications a
     WHERE a.user_id = ?
     ORDER BY a.created_at DESC
