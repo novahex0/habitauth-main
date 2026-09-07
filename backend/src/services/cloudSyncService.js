@@ -322,3 +322,24 @@ export function startPeriodicSync(intervalMs = 60000) {
     process.exit(0);
   });
 }
+
+/**
+ * Permanently purges a ticket and all its threaded messages from Turso Cloud.
+ * Guarantees that deleted tickets and messages can NEVER be restored on server restart or redeploy.
+ */
+export async function purgeTicketFromCloud(ticketId) {
+  if (!TURSO_URL || !TURSO_TOKEN || !ticketId) return;
+  try {
+    await executeTursoBatch([
+      { sql: 'DELETE FROM ticket_messages WHERE ticket_id = ?', args: [ticketId] },
+      { sql: 'DELETE FROM tickets WHERE id = ?', args: [ticketId] }
+    ]);
+    lastSyncedHashes.delete(`tickets:${ticketId}`);
+    const tKeys = knownRowKeysPerTable.get('tickets');
+    if (tKeys) tKeys.delete(String(ticketId));
+    console.log(`[CloudSync] Permanently purged ticket '${ticketId}' and its messages from Turso Cloud.`);
+  } catch (err) {
+    console.error('[CloudSync] Error purging ticket from Turso Cloud:', err.message);
+  }
+}
+

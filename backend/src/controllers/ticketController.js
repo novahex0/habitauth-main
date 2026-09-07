@@ -1,6 +1,7 @@
 import db from '../config/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { recordAuditLog, triggerDiscordWebhook } from '../middleware/helpers.js';
+import { purgeTicketFromCloud, syncNow } from '../services/cloudSyncService.js';
 
 // 1. GET Tickets (Scoped to current developer or admin/owner)
 export function getTickets(req, res) {
@@ -272,7 +273,7 @@ export function updateTicketStatus(req, res) {
   }
 }
 
-// 6. DELETE Ticket
+// 6. DELETE Ticket (Permanently removes ticket and all thread messages from SQLite & Cloud)
 export function deleteTicket(req, res) {
   try {
     const { ticketId } = req.params;
@@ -284,7 +285,7 @@ export function deleteTicket(req, res) {
       return res.status(404).json({ success: false, message: 'Ticket not found.' });
     }
 
-    // Admin, Owner, or Creator can delete
+    // Admin, Owner, Creator, or App Owner can delete
     if (!isPrivileged && ticket.user_id !== user.id) {
       const app = ticket.app_id ? db.prepare('SELECT user_id FROM applications WHERE id = ?').get(ticket.app_id) : null;
       if (!app || app.user_id !== user.id) {
@@ -292,15 +293,73 @@ export function deleteTicket(req, res) {
       }
     }
 
+    // 1. Permanently delete all chat messages from database
+    const msgResult = db.prepare('DELETE FROM ticket_messages WHERE ticket_id = ?').run(ticketId);
+
+    // 2. Permanently delete the ticket record itself
+    db.prepare('DELETE FROM tickets WHERE id = ?').run(ticketId);
+
+    // 3. Immediately purge from Turso Cloud to ensure it never returns upon container restart
+    purgeTicketFromCloud(ticketId).catch(() => {});
+    syncNow(['tickets', 'ticket_messages']).catch(() => {});
+
+    recordAuditLog(user.id, ticket.app_id, 'TICKET_DELETED', `Permanently deleted support ticket '${ticket.title}' and ${msgResult.changes} messages`, req.ip);
+
+    res.json({
+      success: true,
+      message: 'Support ticket and all its chat messages have been permanently deleted.',
+      deletedMessagesCount: msgResult.changes
+    });
+  } catch (err) {
+    console.error('deleteTicket error:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete ticket: ' + err.message });
+  }
+}
+
+// 6b. CLIENT DELETE TICKET (In-App SDK)
+export function clientDeleteTicket(req, res) {
+  try {
+    const ticketId = req.params?.ticketId || req.body?.ticketId;
+    const token = req.body?.token || req.query?.token;
+    const license_key = req.body?.license_key || req.query?.license_key;
+
+    if (!ticketId) {
+      return res.status(400).json({ success: false, message: 'Ticket ID is required.' });
+    }
+
+    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    // Authenticate client
+    let authorized = false;
+    if (token) {
+      const appUser = db.prepare('SELECT app_id, username FROM application_users WHERE token = ?').get(token);
+      if (appUser && (ticket.app_id === appUser.app_id || !ticket.app_id) && ticket.client_username === appUser.username) {
+        authorized = true;
+      }
+    } else if (license_key) {
+      const lic = db.prepare('SELECT app_id, bound_username FROM licenses WHERE license_key = ?').get(license_key);
+      if (lic && (ticket.app_id === lic.app_id || !ticket.app_id) && ticket.client_username === lic.bound_username) {
+        authorized = true;
+      }
+    }
+
+    if (!authorized) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to delete this ticket.' });
+    }
+
     db.prepare('DELETE FROM ticket_messages WHERE ticket_id = ?').run(ticketId);
     db.prepare('DELETE FROM tickets WHERE id = ?').run(ticketId);
 
-    recordAuditLog(user.id, ticket.app_id, 'TICKET_DELETED', `Deleted support ticket '${ticket.title}'`, req.ip);
+    purgeTicketFromCloud(ticketId).catch(() => {});
+    syncNow(['tickets', 'ticket_messages']).catch(() => {});
 
-    res.json({ success: true, message: 'Ticket deleted successfully.' });
+    res.json({ success: true, message: 'Ticket and all chat messages permanently deleted.' });
   } catch (err) {
-    console.error('deleteTicket error:', err);
-    res.status(500).json({ success: false, message: 'Failed to delete ticket.' });
+    console.error('clientDeleteTicket error:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete ticket: ' + err.message });
   }
 }
 

@@ -45,7 +45,7 @@ import {
 } from '../controllers/featuresController.js';
 import { 
   getTickets, createTicket, getTicketById, addTicketMessage, updateTicketStatus, deleteTicket,
-  clientCreateTicket, clientListTickets, clientReplyTicket
+  clientCreateTicket, clientListTickets, clientReplyTicket, clientDeleteTicket
 } from '../controllers/ticketController.js';
 import { 
   getBlacklists, addBlacklist, removeBlacklist 
@@ -167,6 +167,9 @@ router.post('/client/tickets/create', clientCreateTicket);
 router.get('/client/tickets/list', clientListTickets);
 router.post('/client/tickets/list', clientListTickets);
 router.post('/client/tickets/reply', clientReplyTicket);
+router.delete('/client/tickets/:ticketId', clientDeleteTicket);
+router.post('/client/tickets/:ticketId/delete', clientDeleteTicket);
+router.post('/client/tickets/delete', clientDeleteTicket);
 
 // Direct Browser GET Request Protection: Return HTTP 405 Method Not Allowed
 const clientGetNotAllowed = (req, res) => {

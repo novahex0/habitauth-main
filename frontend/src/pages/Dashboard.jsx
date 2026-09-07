@@ -1134,7 +1134,14 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
       fetch(`/api/v1/tickets/${selectedTicket.id}`, { headers: getHeaders() })
         .then(r => r.json())
         .then(data => {
-          if (data.success && data.messages) {
+          if (!data || !data.success) {
+            // Ticket was deleted or no longer exists - close modal immediately
+            setSelectedTicket(null);
+            setTicketMessages([]);
+            fetchTickets();
+            return;
+          }
+          if (data.messages) {
             setTicketMessages(data.messages);
             if (data.ticket && data.ticket.status !== selectedTicket.status) {
               setSelectedTicket(prev => ({ ...prev, status: data.ticket.status }));
@@ -1388,9 +1395,9 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
 
   const handleDeleteTicket = async (ticketId) => {
     promptConfirm({
-      title: 'Delete Support Ticket',
-      message: 'Are you sure you want to permanently delete this support ticket thread? This cannot be undone.',
-      confirmText: 'Delete Ticket',
+      title: 'Permanently Delete Support Ticket',
+      message: 'Are you sure you want to permanently delete this support ticket and all associated messages? This thread cannot be recovered.',
+      confirmText: 'Delete Ticket & Messages',
       isDanger: true,
       onConfirm: async () => {
         try {
@@ -1400,11 +1407,15 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
           });
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete ticket');
-          showToast('Ticket thread deleted.');
-          if (selectedTicket && selectedTicket.id === ticketId) setSelectedTicket(null);
+          showToast('Ticket thread and all messages permanently deleted.');
+          if (selectedTicket && selectedTicket.id === ticketId) {
+            setSelectedTicket(null);
+            setTicketMessages([]);
+          }
+          setTickets(prev => prev.filter(t => t.id !== ticketId));
           fetchTickets();
         } catch (err) {
-          showToast(err.message);
+          showToast(err.message, 'error');
         }
       }
     });
@@ -13415,6 +13426,26 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                     </span>
                   )}
                 </div>
+
+                <button 
+                  className="icon-btn" 
+                  onClick={() => handleDeleteTicket(selectedTicket.id)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ef4444',
+                    cursor: 'pointer'
+                  }}
+                  title="Permanently Delete Ticket"
+                >
+                  <Trash2 size={16} />
+                </button>
 
                 <button 
                   className="icon-btn" 
