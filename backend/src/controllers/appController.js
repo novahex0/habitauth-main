@@ -301,6 +301,15 @@ export function getLiveOnlineUsers(req, res) {
     const app = verifyAppAccess(appId, userId, 'view_analytics', isAdmin);
     if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
+    // Enforce Plan: Live Radar is exclusive to Developer & Pro plans of the application owner
+    if (!isAdmin && app.effectivePlan === 'free') {
+      return res.status(403).json({
+        success: false,
+        code: 'RADAR_PLAN_REQUIRED',
+        message: 'Live Online Radar telemetry is exclusive to Developer and Pro Developer plans. The owner of this application must upgrade to access real-time workstation telemetry.'
+      });
+    }
+
     liveUsers = db.prepare(`
       SELECT 
         u.id, u.username, u.hwid, u.last_ip, u.last_heartbeat, u.last_login, u.status, 
@@ -313,7 +322,7 @@ export function getLiveOnlineUsers(req, res) {
       ORDER BY u.session_killed ASC, u.last_heartbeat DESC
     `).all(app.id, app.app_name, activeWindow, activeWindow);
   } else {
-    // Global / All apps for this developer or team member
+    // Global / All apps for this developer or team member (filtered by plan tier)
     if (isAdmin) {
       liveUsers = db.prepare(`
         SELECT 
@@ -333,12 +342,18 @@ export function getLiveOnlineUsers(req, res) {
         FROM application_users u
         JOIN applications a ON a.id = u.app_id
         WHERE (
-          a.user_id = ? 
+          (a.user_id = ? AND (
+            EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = a.user_id AND s.plan IN ('developer', 'pro') AND s.status = 'active')
+            OR EXISTS (SELECT 1 FROM accounts acc WHERE acc.id = a.user_id AND acc.role IN ('admin', 'owner'))
+          ))
           OR a.id IN (
             SELECT app.id FROM applications app
             JOIN teams t ON t.owner_id = app.user_id
             JOIN team_members tm ON tm.team_id = t.id
+            LEFT JOIN subscriptions sub ON sub.user_id = t.owner_id AND sub.status = 'active'
+            LEFT JOIN accounts acc ON acc.id = t.owner_id
             WHERE tm.user_id = ? AND tm.status = 'active'
+              AND (sub.plan IN ('developer', 'pro') OR acc.role IN ('admin', 'owner'))
           )
         )
         AND (u.last_heartbeat >= ? OR (u.last_login >= ? AND u.is_online = 1) OR u.session_killed = 1)
@@ -378,6 +393,14 @@ export function killUserSession(req, res) {
   const app = verifyAppAccess(appId, adminId, 'view_analytics', isAdmin);
   if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
+  if (!isAdmin && app.effectivePlan === 'free') {
+    return res.status(403).json({
+      success: false,
+      code: 'RADAR_PLAN_REQUIRED',
+      message: 'Remote session management requires a Developer or Pro Developer plan.'
+    });
+  }
+
   const user = db.prepare('SELECT id, username, hwid FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!user) return res.status(404).json({ success: false, message: 'User not found in this application.' });
 
@@ -406,6 +429,14 @@ export function reviveUserSession(req, res) {
   const app = verifyAppAccess(appId, adminId, 'view_analytics', isAdmin);
   if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
+  if (!isAdmin && app.effectivePlan === 'free') {
+    return res.status(403).json({
+      success: false,
+      code: 'RADAR_PLAN_REQUIRED',
+      message: 'Remote session management requires a Developer or Pro Developer plan.'
+    });
+  }
+
   const user = db.prepare('SELECT id, username FROM application_users WHERE id = ? AND (app_id = ? OR app_id = ?)').get(targetUserId, app.id, app.app_name);
   if (!user) return res.status(404).json({ success: false, message: 'User not found in this application.' });
 
@@ -427,6 +458,14 @@ export function killAllAppSessions(req, res) {
 
   const app = verifyAppAccess(appId, adminId, 'view_analytics', isAdmin);
   if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
+
+  if (!isAdmin && app.effectivePlan === 'free') {
+    return res.status(403).json({
+      success: false,
+      code: 'RADAR_PLAN_REQUIRED',
+      message: 'Remote session management requires a Developer or Pro Developer plan.'
+    });
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const activeWindow = now - 300;

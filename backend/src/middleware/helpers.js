@@ -50,7 +50,7 @@ export function verifyAppAccess(appId, userId, requiredPerm = null, isSuperAdmin
   // 2. Direct Application Owner check
   const directApp = db.prepare('SELECT * FROM applications WHERE (id = ? OR app_name = ?) AND user_id = ?').get(appId, appId, userId);
   if (directApp) {
-    const ownerSub = db.prepare('SELECT plan FROM subscriptions WHERE user_id = ?').get(userId);
+    const ownerSub = db.prepare("SELECT plan FROM subscriptions WHERE user_id = ? AND status = 'active'").get(userId);
     const ownerAcc = db.prepare('SELECT role FROM accounts WHERE id = ?').get(userId);
     const effectivePlan = (ownerAcc?.role === 'admin' || ownerAcc?.role === 'owner') ? 'pro' : (ownerSub?.plan || 'free');
     return { ...directApp, accessRole: 'owner', isAdmin: true, effectivePlan, ownerId: userId, isTeamAccess: false };
@@ -85,9 +85,9 @@ export function verifyAppAccess(appId, userId, requiredPerm = null, isSuperAdmin
   }
 
   // Resolve application owner's plan for quota limits
-  const ownerSub = db.prepare('SELECT plan FROM subscriptions WHERE user_id = ?').get(teamApp.app_owner_id);
-  const ownerAcc = db.prepare('SELECT role FROM accounts WHERE id = ?').get(teamApp.app_owner_id);
-  const effectivePlan = (ownerAcc?.role === 'admin' || ownerAcc?.role === 'owner') ? 'pro' : (ownerSub?.plan || 'developer');
+  const teamOwnerSub = db.prepare("SELECT plan FROM subscriptions WHERE user_id = ? AND status = 'active'").get(teamApp.app_owner_id);
+  const teamOwnerAcc = db.prepare('SELECT role FROM accounts WHERE id = ?').get(teamApp.app_owner_id);
+  const effectivePlan = (teamOwnerAcc?.role === 'admin' || teamOwnerAcc?.role === 'owner') ? 'pro' : (teamOwnerSub?.plan || 'free');
 
   return {
     ...teamApp,
