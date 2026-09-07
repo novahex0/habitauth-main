@@ -979,23 +979,51 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
     try {
       setLoading(true);
       const [appRes, usersRes, licensesRes, webhooksRes] = await Promise.all([
-        fetch(`/api/v1/apps/${appId}`, { headers: getHeaders() }),
-        fetch(`/api/v1/apps/${appId}/users`, { headers: getHeaders() }),
-        fetch(`/api/v1/apps/${appId}/licenses`, { headers: getHeaders() }),
-        fetch(`/api/v1/apps/${appId}/webhooks`, { headers: getHeaders() })
+        fetch(`/api/v1/apps/${appId}`, { headers: getHeaders() }).catch(() => null),
+        fetch(`/api/v1/apps/${appId}/users`, { headers: getHeaders() }).catch(() => null),
+        fetch(`/api/v1/apps/${appId}/licenses`, { headers: getHeaders() }).catch(() => null),
+        fetch(`/api/v1/apps/${appId}/webhooks`, { headers: getHeaders() }).catch(() => null)
       ]);
 
-      const [appData, usersData, licensesData, webhooksData] = await Promise.all([
-        appRes.json(), usersRes.json(), licensesRes.json(), webhooksRes.json()
-      ]);
+      if (appRes && appRes.ok) {
+        try {
+          const appData = await appRes.json();
+          if (appData.success && appData.application) setCurrentAppDetails(appData.application);
+        } catch (e) {
+          console.error('Error parsing app data:', e);
+        }
+      }
 
-      if (appData.success) setCurrentAppDetails(appData.application);
-      if (usersData.success) setAppUsers(usersData.users);
-      if (licensesData.success) setAppLicenses(licensesData.licenses);
-      if (webhooksData.success) setAppWebhooks(webhooksData.webhooks);
+      if (usersRes && usersRes.ok) {
+        try {
+          const usersData = await usersRes.json();
+          if (usersData.success && Array.isArray(usersData.users)) setAppUsers(usersData.users);
+        } catch (e) {
+          console.error('Error parsing users data:', e);
+        }
+      }
+
+      if (licensesRes && licensesRes.ok) {
+        try {
+          const licensesData = await licensesRes.json();
+          if (licensesData.success && Array.isArray(licensesData.licenses)) setAppLicenses(licensesData.licenses);
+        } catch (e) {
+          console.error('Error parsing licenses data:', e);
+        }
+      }
+
+      if (webhooksRes && webhooksRes.ok) {
+        try {
+          const webhooksData = await webhooksRes.json();
+          if (webhooksData.success && Array.isArray(webhooksData.webhooks)) setAppWebhooks(webhooksData.webhooks);
+        } catch (e) {
+          console.error('Error parsing webhooks data:', e);
+        }
+      }
+
       fetchLiveUsers(appId);
     } catch (err) {
-      console.error(err);
+      console.error('fetchCurrentApp failed:', err);
     } finally {
       setLoading(false);
     }
@@ -4691,7 +4719,17 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                       <div className="user-avatar">{app.app_name.slice(0, 2).toUpperCase()}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="user-card-name">{app.app_name}</div>
-                        <div className="user-card-meta">ID: {app.id.slice(0, 14)}...</div>
+                        <div className="user-card-meta" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span title={app.id} style={{ fontFamily: 'var(--font-mono)' }}>ID: {app.id}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(app.id, `ov_id_${app.id}`); }}
+                            style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', color: copiedKey === `ov_id_${app.id}` ? 'var(--success)' : 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' }}
+                            title="Copy Full App ID"
+                          >
+                            {copiedKey === `ov_id_${app.id}` ? <Check size={12} /> : <Copy size={12} />}
+                          </button>
+                        </div>
                       </div>
                       <span className="badge badge-active">{app.status}</span>
                     </div>
@@ -4719,7 +4757,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                       <button className="user-action-btn edit" onClick={(e) => { e.stopPropagation(); setSelectedAppId(app.id); setActiveNav('users'); }}>
                         Manage Users
                       </button>
-                      <button className="user-action-btn hwid" onClick={(e) => { e.stopPropagation(); setSelectedAppId(app.id); setActiveNav('apps'); }}>
+                      <button className="user-action-btn hwid" onClick={(e) => { e.stopPropagation(); setSelectedAppId(app.id); fetchCurrentApp(app.id); setActiveNav('apps'); }}>
                         Credentials
                       </button>
                       <button 
@@ -4936,7 +4974,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
             </header>
 
             {/* Application Credentials Card */}
-            {currentAppDetails && (
+            {currentAppDetails ? (
               <div className="glass-panel" style={{ padding: '28px', marginBottom: '32px' }}>
                 <div className="flex-between" style={{ marginBottom: '24px' }}>
                   <div>
@@ -5076,7 +5114,39 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   </div>
                 </div>
               </div>
-            )}
+            ) : loading ? (
+              <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', marginBottom: '32px' }}>
+                <RefreshCw size={24} className="spinning" style={{ margin: '0 auto 12px', color: 'var(--primary)' }} />
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Loading application credentials...</p>
+              </div>
+            ) : selectedApp ? (
+              <div className="glass-panel" style={{ padding: '28px', marginBottom: '32px' }}>
+                <div className="flex-between" style={{ marginBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '20px', fontWeight: 800 }}>{selectedApp.app_name} Credentials</h3>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                      Scope active: {selectedApp.app_name}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => fetchCurrentApp(selectedApp.id)} 
+                    className="btn btn-primary"
+                    style={{ fontSize: '12px', padding: '8px 16px' }}
+                  >
+                    <RefreshCw size={13} style={{ marginRight: '6px' }} /> Load Credentials
+                  </button>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontWeight: 600 }}>App ID / Owner ID</label>
+                  <div className="flex-align" style={{ gap: '8px' }}>
+                    <input type="text" readOnly value={selectedApp.id} className="form-input mono-text" style={{ color: 'var(--primary-light)', fontWeight: 700 }} />
+                    <button onClick={() => copyToClipboard(selectedApp.id, 'app_id')} className="btn btn-secondary" style={{ padding: '10px' }} title="Copy App ID">
+                      {copiedKey === 'app_id' ? <Check size={16} color="var(--success)" /> : <Copy size={16} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {/* AUTO-UPDATE, .EXE DOWNLOAD URL & ANTI-CHEAT CENTER */}
             {currentAppDetails && (
@@ -5377,7 +5447,17 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   <div className="user-card-body">
                     <div className="user-info-row">
                       <span className="user-info-label">App ID</span>
-                      <span className="user-info-value mono-text">{app.id.slice(0, 14)}...</span>
+                      <span className="user-info-value mono-text" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <span title={app.id}>{app.id}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); copyToClipboard(app.id, `grid_id_${app.id}`); }}
+                          style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', color: copiedKey === `grid_id_${app.id}` ? 'var(--success)' : 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' }}
+                          title="Copy Full App ID"
+                        >
+                          {copiedKey === `grid_id_${app.id}` ? <Check size={12} /> : <Copy size={12} />}
+                        </button>
+                      </span>
                     </div>
                     <div className="user-info-row">
                       <span className="user-info-label">Users</span>
@@ -5394,7 +5474,7 @@ export default function Dashboard({ user, onLogout, onBackToLanding, onUpgradeCl
                   </div>
 
                   <div className="user-card-actions">
-                    <button className="user-action-btn edit" onClick={() => setSelectedAppId(app.id)}>
+                    <button className="user-action-btn edit" onClick={() => { setSelectedAppId(app.id); fetchCurrentApp(app.id); }}>
                       {selectedAppId === app.id ? 'Active Scope' : 'Select'}
                     </button>
                     <button className="user-action-btn hwid" onClick={() => { setSelectedAppId(app.id); setActiveNav('users'); }}>

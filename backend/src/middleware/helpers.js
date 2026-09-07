@@ -40,8 +40,8 @@ export function verifyAppAccess(appId, userId, requiredPerm = null, isSuperAdmin
     const app = db.prepare('SELECT * FROM applications WHERE id = ? OR app_name = ?').get(appId, appId);
     if (app) {
       const ownerSub = db.prepare('SELECT plan FROM subscriptions WHERE user_id = ?').get(app.user_id);
-      const ownerAcc = db.prepare('SELECT plan, role FROM accounts WHERE id = ?').get(app.user_id);
-      const effectivePlan = (ownerAcc?.role === 'admin') ? 'pro' : (ownerSub?.plan || ownerAcc?.plan || 'pro');
+      const ownerAcc = db.prepare('SELECT role FROM accounts WHERE id = ?').get(app.user_id);
+      const effectivePlan = (ownerAcc?.role === 'admin' || ownerAcc?.role === 'owner') ? 'pro' : (ownerSub?.plan || 'pro');
       return { ...app, accessRole: 'admin', isAdmin: true, effectivePlan, ownerId: app.user_id, isTeamAccess: false };
     }
     return null;
@@ -51,8 +51,8 @@ export function verifyAppAccess(appId, userId, requiredPerm = null, isSuperAdmin
   const directApp = db.prepare('SELECT * FROM applications WHERE (id = ? OR app_name = ?) AND user_id = ?').get(appId, appId, userId);
   if (directApp) {
     const ownerSub = db.prepare('SELECT plan FROM subscriptions WHERE user_id = ?').get(userId);
-    const ownerAcc = db.prepare('SELECT plan, role FROM accounts WHERE id = ?').get(userId);
-    const effectivePlan = (ownerAcc?.role === 'admin') ? 'pro' : (ownerSub?.plan || ownerAcc?.plan || 'free');
+    const ownerAcc = db.prepare('SELECT role FROM accounts WHERE id = ?').get(userId);
+    const effectivePlan = (ownerAcc?.role === 'admin' || ownerAcc?.role === 'owner') ? 'pro' : (ownerSub?.plan || 'free');
     return { ...directApp, accessRole: 'owner', isAdmin: true, effectivePlan, ownerId: userId, isTeamAccess: false };
   }
 
@@ -86,8 +86,8 @@ export function verifyAppAccess(appId, userId, requiredPerm = null, isSuperAdmin
 
   // Resolve application owner's plan for quota limits
   const ownerSub = db.prepare('SELECT plan FROM subscriptions WHERE user_id = ?').get(teamApp.app_owner_id);
-  const ownerAcc = db.prepare('SELECT plan, role FROM accounts WHERE id = ?').get(teamApp.app_owner_id);
-  const effectivePlan = (ownerAcc?.role === 'admin') ? 'pro' : (ownerSub?.plan || ownerAcc?.plan || 'developer');
+  const ownerAcc = db.prepare('SELECT role FROM accounts WHERE id = ?').get(teamApp.app_owner_id);
+  const effectivePlan = (ownerAcc?.role === 'admin' || ownerAcc?.role === 'owner') ? 'pro' : (ownerSub?.plan || 'developer');
 
   return {
     ...teamApp,

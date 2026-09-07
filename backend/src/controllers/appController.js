@@ -25,17 +25,18 @@ export function getApplications(req, res) {
 export function getApplicationById(req, res) {
   const { appId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin' || req.user.role === 'owner';
 
-  const app = db.prepare('SELECT * FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
+  const app = verifyAppAccess(appId, userId, null, isSuperAdmin);
   if (!app) {
     return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
   }
 
   // Aggregate stats
-  const totalUsers = db.prepare('SELECT COUNT(*) as count FROM application_users WHERE app_id = ?').get(appId).count;
-  const totalLicenses = db.prepare('SELECT COUNT(*) as count FROM licenses WHERE app_id = ?').get(appId).count;
-  const activeLicenses = db.prepare("SELECT COUNT(*) as count FROM licenses WHERE app_id = ? AND status = 'active'").get(appId).count;
-  const boundDevices = db.prepare('SELECT COUNT(*) as count FROM devices WHERE app_id = ?').get(appId).count;
+  const totalUsers = db.prepare('SELECT COUNT(*) as count FROM application_users WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name).count;
+  const totalLicenses = db.prepare('SELECT COUNT(*) as count FROM licenses WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name).count;
+  const activeLicenses = db.prepare("SELECT COUNT(*) as count FROM licenses WHERE (app_id = ? OR app_id = ?) AND status = 'active'").get(app.id, app.app_name).count;
+  const boundDevices = db.prepare('SELECT COUNT(*) as count FROM devices WHERE app_id = ? OR app_id = ?').get(app.id, app.app_name).count;
 
   res.json({
     success: true,
@@ -147,8 +148,9 @@ export function createApplication(req, res) {
 export function regenerateSecret(req, res) {
   const { appId } = req.params;
   const userId = req.user.id;
+  const isSuperAdmin = req.user.role === 'admin' || req.user.role === 'owner';
 
-  const app = db.prepare('SELECT * FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
+  const app = verifyAppAccess(appId, userId, null, isSuperAdmin);
   if (!app) {
     return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
   }
@@ -158,7 +160,7 @@ export function regenerateSecret(req, res) {
   const now = Math.floor(Date.now() / 1000);
 
   db.prepare('UPDATE applications SET app_secret = ?, public_key = ?, private_key = ?, updated_at = ? WHERE id = ?')
-    .run(newSecret, newEdKeys.publicKeyHex, newEdKeys.privateKeyPem, now, appId);
+    .run(newSecret, newEdKeys.publicKeyHex, newEdKeys.privateKeyPem, now, app.id);
 
   recordAuditLog(userId, appId, 'APP_SECRET_REGENERATED', `App secret and Ed25519 keypair regenerated for '${app.app_name}'.`, req.ip);
 
@@ -235,8 +237,9 @@ export function updateAppSecurityConfig(req, res) {
     token_validation_enabled
   } = req.body;
 
-  const app = db.prepare('SELECT id, app_name FROM applications WHERE id = ? AND user_id = ?').get(appId, userId);
-  if (!app) return res.status(404).json({ success: false, message: 'Application not found.' });
+  const isSuperAdmin = req.user.role === 'admin' || req.user.role === 'owner';
+  const app = verifyAppAccess(appId, userId, null, isSuperAdmin);
+  if (!app) return res.status(404).json({ success: false, message: 'Application not found or unauthorized.' });
 
   const now = Math.floor(Date.now() / 1000);
 
