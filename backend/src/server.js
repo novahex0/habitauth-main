@@ -118,6 +118,7 @@ app.get('/favicon-192x192.png', serveStaticFile('favicon-192x192.png', 'image/pn
 app.get('/apple-touch-icon.png', serveStaticFile('apple-touch-icon.png', 'image/png'));
 app.get('/logo.png', serveStaticFile('logo.png', 'image/png'));
 app.get('/brand.png', serveStaticFile('brand.png', 'image/png'));
+app.get('/brand.webp', serveStaticFile('brand.webp', 'image/webp'));
 app.get('/site.webmanifest', serveStaticFile('site.webmanifest', 'application/manifest+json'));
 app.get('/robots.txt', serveStaticFile('robots.txt', 'text/plain', 'public, max-age=86400'));
 app.get('/sitemap.xml', serveStaticFile('sitemap.xml', 'application/xml', 'public, max-age=86400'));

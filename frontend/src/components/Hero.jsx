@@ -372,18 +372,32 @@ export default function Hero({ user, onOpenLogin, onExplorePricing, onNavigate }
                 </div>
               </div>
 
-              {/* Inner Radar Dashboard Interface (Desktop brand.png) */}
-              <div style={{ background: '#0a0d14', position: 'relative', overflow: 'hidden' }}>
-                <img 
-                  src="/brand.png" 
-                  alt="Habit Auth Radar & Control Center" 
-                  style={{
-                    width: '100%',
-                    height: 'auto',
-                    display: 'block',
-                    objectFit: 'cover'
-                  }} 
-                />
+              {/* Inner Radar Dashboard Interface (Desktop brand.webp / brand.png) */}
+              <div style={{
+                background: '#0a0d14',
+                position: 'relative',
+                overflow: 'hidden',
+                width: '100%',
+                aspectRatio: '1920 / 923'
+              }}>
+                <picture>
+                  <source srcSet="/brand.webp" type="image/webp" />
+                  <img 
+                    src="/brand.png" 
+                    alt="Habit Auth Radar & Control Center" 
+                    width="1920"
+                    height="923"
+                    loading="eager"
+                    fetchPriority="high"
+                    decoding="sync"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'block',
+                      objectFit: 'cover'
+                    }} 
+                  />
+                </picture>
               </div>
             </div>
             )}
