@@ -2,6 +2,7 @@ import db from '../config/db.js';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { recordAuditLog, triggerDiscordWebhook, sendInAppNotification, verifyAppAccess } from '../middleware/helpers.js';
+import { syncNow, purgeRowFromCloud } from '../services/cloudSyncService.js';
 
 function generateRandomSegment(length = 4) {
   return crypto.randomBytes(length).toString('hex').slice(0, length).toUpperCase();
@@ -103,6 +104,8 @@ export function generateLicenses(req, res) {
     'info'
   );
 
+  syncNow(['licenses', 'audit_logs', 'notifications']).catch(() => {});
+
   res.status(201).json({
     success: true,
     message: `Generated ${parsedCount} license key(s) successfully!`,
@@ -126,6 +129,7 @@ export function revokeLicense(req, res) {
   db.prepare('UPDATE licenses SET status = ? WHERE id = ?').run(newStatus, licenseId);
 
   recordAuditLog(userId, app.id, newStatus === 'revoked' ? 'LICENSE_REVOKED' : 'LICENSE_RESTORED', `License '${lic.license_key}' marked as ${newStatus} by @${req.user.username}`, req.ip);
+  syncNow('licenses').catch(() => {});
   res.json({ success: true, message: `License '${lic.license_key}' status updated to ${newStatus}.` });
 }
 
@@ -143,6 +147,7 @@ export function resetLicenseHwid(req, res) {
 
   db.prepare('UPDATE licenses SET bound_hwid = NULL WHERE id = ?').run(licenseId);
   recordAuditLog(userId, app.id, 'HWID_RESET', `Reset bound HWID on license '${lic.license_key}' by @${req.user.username}`, req.ip);
+  syncNow('licenses').catch(() => {});
 
   res.json({ success: true, message: `Hardware profile reset on license '${lic.license_key}'.` });
 }
@@ -165,6 +170,8 @@ export function deleteLicense(req, res) {
 
   db.prepare('DELETE FROM licenses WHERE id = ?').run(licenseId);
   recordAuditLog(userId, app.id, 'LICENSE_DELETED', `Deleted license key '${lic.license_key}' by @${req.user.username}`, req.ip);
+  purgeRowFromCloud('licenses', licenseId).catch(() => {});
+  syncNow('licenses').catch(() => {});
 
   res.json({ success: true, message: `License '${lic.license_key}' deleted.` });
 }
@@ -250,6 +257,8 @@ export function bulkGenerateLicenses(req, res) {
     { name: 'Duration', value: duration_days === 0 ? 'Lifetime' : `${duration_days} Days` },
     { name: 'Format', value: effectiveMask || `${cleanPrefix}-XXXX-XXXX` }
   ]);
+
+  syncNow(['licenses', 'audit_logs', 'notifications']).catch(() => {});
 
   res.status(201).json({
     success: true,

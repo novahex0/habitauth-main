@@ -204,21 +204,7 @@ export async function pushToCloud(tableList = SYNC_TABLES) {
         }
       }
 
-      // Check for deleted rows that existed in Turso but are now removed from SQLite
-      const knownKeys = knownRowKeysPerTable.get(table) || new Set();
-      for (const oldKey of knownKeys) {
-        if (!currentKeys.has(oldKey)) {
-          batchStmts.push({
-            sql: `DELETE FROM ${table} WHERE ${pkCol} = ?`,
-            args: [oldKey]
-          });
-          pendingKeyDeletions.push({
-            table,
-            rowKey: oldKey
-          });
-        }
-      }
-
+      // Keep track of current keys in memory so cache remains fresh
       knownRowKeysPerTable.set(table, currentKeys);
     } catch (err) {
       // Non-blocking log
@@ -342,4 +328,24 @@ export async function purgeTicketFromCloud(ticketId) {
     console.error('[CloudSync] Error purging ticket from Turso Cloud:', err.message);
   }
 }
+
+/**
+ * Explicitly purges a specific row from Turso Cloud when deleted by user action.
+ * Prevents accidental mass deletions during synchronization.
+ */
+export async function purgeRowFromCloud(table, rowId, pkCol = 'id') {
+  if (!TURSO_URL || !TURSO_TOKEN || !rowId) return;
+  try {
+    await executeTursoBatch([
+      { sql: `DELETE FROM ${table} WHERE ${pkCol} = ?`, args: [rowId] }
+    ]);
+    lastSyncedHashes.delete(`${table}:${rowId}`);
+    const tableKeys = knownRowKeysPerTable.get(table);
+    if (tableKeys) tableKeys.delete(String(rowId));
+    console.log(`[CloudSync] Explicitly purged '${rowId}' from ${table} in Turso Cloud.`);
+  } catch (err) {
+    console.error(`[CloudSync] Error purging from ${table}:`, err.message);
+  }
+}
+
 

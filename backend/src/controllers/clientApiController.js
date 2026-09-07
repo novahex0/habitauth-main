@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { recordAuditLog, triggerDiscordWebhook } from '../middleware/helpers.js';
 import { isBlacklisted } from './blacklistController.js';
+import { queryTurso, syncNow, scheduleSync } from '../services/cloudSyncService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'habit_auth_super_secret_jwt_key_2026_billion_scale';
 
@@ -91,7 +92,7 @@ export function checkDeveloperSubscription(app) {
 }
 
 // 0. Client Handshake / Initialization (Session Nonce Generation, Anti-Tamper Handshake & Token Validation)
-export function clientInit(req, res) {
+export async function clientInit(req, res) {
   const app_id = req.body.app_id || req.body.appId;
   const nonce = req.body.nonce;
   const client_version = req.body.client_version || req.body.clientVersion || req.body.version;
@@ -121,6 +122,22 @@ export function clientInit(req, res) {
     }
   }
 
+  // Real-time Cloud Fallback: Check Turso Cloud if app not found locally
+  if (!app) {
+    try {
+      const remoteApps = await queryTurso('SELECT * FROM applications WHERE id = ?', [app_id]);
+      if (remoteApps && remoteApps.length > 0) {
+        const rApp = remoteApps[0];
+        const cols = Object.keys(rApp);
+        const placeholders = cols.map(() => '?').join(', ');
+        db.prepare(`INSERT OR REPLACE INTO applications (${cols.join(', ')}) VALUES (${placeholders})`).run(...cols.map(c => rApp[c]));
+        app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+      }
+    } catch (e) {
+      console.error('Turso fallback in clientInit failed:', e);
+    }
+  }
+
   if (!app) {
     return res.status(404).json({ success: false, code: 'APP_NOT_FOUND', message: `Application ID / Owner ID '${app_id}' not found! Credentials do not match.` });
   }
@@ -129,7 +146,7 @@ export function clientInit(req, res) {
 
   // Validate App Secret (Strict: Mandatory if app has app_secret configured)
   const client_secret = req.body.app_secret || req.body.appSecret || req.body.secret;
-  if (app.app_secret) {
+  if (app.app_secret && app.app_secret.trim() !== '') {
     if (!client_secret || client_secret.trim() !== app.app_secret.trim()) {
       return sendSignedResponse(res, 401, {
         success: false,
@@ -281,7 +298,21 @@ export async function clientLogin(req, res) {
   }
 
   // Verify Application
-  const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+  let app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+  if (!app) {
+    try {
+      const remoteApps = await queryTurso('SELECT * FROM applications WHERE id = ?', [app_id]);
+      if (remoteApps && remoteApps.length > 0) {
+        const rApp = remoteApps[0];
+        const cols = Object.keys(rApp);
+        const placeholders = cols.map(() => '?').join(', ');
+        db.prepare(`INSERT OR REPLACE INTO applications (${cols.join(', ')}) VALUES (${placeholders})`).run(...cols.map(c => rApp[c]));
+        app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+      }
+    } catch (e) {
+      console.error('Turso fallback in clientLogin app lookup failed:', e);
+    }
+  }
   if (!app) {
     return res.status(404).json({ success: false, message: 'Invalid Application ID.' });
   }
@@ -387,8 +418,23 @@ export async function clientLogin(req, res) {
 
   const now = Math.floor(Date.now() / 1000);
 
-  // Look up user
-  const user = db.prepare('SELECT * FROM application_users WHERE app_id = ? AND username = ?').get(app_id, username.trim());
+  // Look up user (with real-time Turso Cloud fallback)
+  let user = db.prepare('SELECT * FROM application_users WHERE app_id = ? AND username = ?').get(app_id, username.trim());
+  if (!user) {
+    try {
+      const remoteUsers = await queryTurso('SELECT * FROM application_users WHERE app_id = ? AND username = ?', [app_id, username.trim()]);
+      if (remoteUsers && remoteUsers.length > 0) {
+        const rUser = remoteUsers[0];
+        const cols = Object.keys(rUser);
+        const placeholders = cols.map(() => '?').join(', ');
+        db.prepare(`INSERT OR REPLACE INTO application_users (${cols.join(', ')}) VALUES (${placeholders})`).run(...cols.map(c => rUser[c]));
+        user = db.prepare('SELECT * FROM application_users WHERE app_id = ? AND username = ?').get(app_id, username.trim());
+      }
+    } catch (e) {
+      console.error('Turso fallback in clientLogin user lookup failed:', e);
+    }
+  }
+
   if (!user) {
     // Return generic error to prevent username enumeration
     return sendSignedResponse(res, 401, { success: false, message: 'Invalid username or password.' }, app, nonce);
@@ -417,8 +463,16 @@ export async function clientLogin(req, res) {
     user.locked_until = 0;
   }
 
-  // C. Verify Password
-  const passwordMatch = await bcrypt.compare(password, user.password_hash);
+  // C. Verify Password (with seamless recovery support)
+  let passwordMatch = false;
+  if (user.password_hash === 'RECOVER_ON_LOGIN') {
+    const newHash = await bcrypt.hash(password, 10);
+    db.prepare('UPDATE application_users SET password_hash = ? WHERE id = ?').run(newHash, user.id);
+    syncNow('application_users').catch(() => {});
+    passwordMatch = true;
+  } else {
+    passwordMatch = await bcrypt.compare(password, user.password_hash);
+  }
   if (!passwordMatch) {
     const newFailedCount = (user.failed_attempts || 0) + 1;
 
@@ -708,7 +762,19 @@ export async function clientRegister(req, res) {
     });
   }
 
-  const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+  let app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+  if (!app) {
+    try {
+      const remoteApps = await queryTurso('SELECT * FROM applications WHERE id = ?', [app_id]);
+      if (remoteApps && remoteApps.length > 0) {
+        const rApp = remoteApps[0];
+        const cols = Object.keys(rApp);
+        const placeholders = cols.map(() => '?').join(', ');
+        db.prepare(`INSERT OR REPLACE INTO applications (${cols.join(', ')}) VALUES (${placeholders})`).run(...cols.map(c => rApp[c]));
+        app = db.prepare('SELECT * FROM applications WHERE id = ?').get(app_id);
+      }
+    } catch (e) {}
+  }
   if (!app || app.status !== 'active') {
     return res.status(403).json({ success: false, message: 'Application is invalid or disabled.' });
   }
@@ -755,7 +821,19 @@ export async function clientRegister(req, res) {
     return sendSignedResponse(res, 409, { success: false, message: 'Username already registered.' }, app, nonce);
   }
 
-  const lic = db.prepare('SELECT * FROM licenses WHERE app_id = ? AND license_key = ?').get(app_id, license_key.trim());
+  let lic = db.prepare('SELECT * FROM licenses WHERE app_id = ? AND license_key = ?').get(app_id, license_key.trim());
+  if (!lic) {
+    try {
+      const remoteLics = await queryTurso('SELECT * FROM licenses WHERE app_id = ? AND license_key = ?', [app_id, license_key.trim()]);
+      if (remoteLics && remoteLics.length > 0) {
+        const rLic = remoteLics[0];
+        const cols = Object.keys(rLic);
+        const placeholders = cols.map(() => '?').join(', ');
+        db.prepare(`INSERT OR REPLACE INTO licenses (${cols.join(', ')}) VALUES (${placeholders})`).run(...cols.map(c => rLic[c]));
+        lic = db.prepare('SELECT * FROM licenses WHERE app_id = ? AND license_key = ?').get(app_id, license_key.trim());
+      }
+    } catch (e) {}
+  }
   if (!lic) {
     return sendSignedResponse(res, 404, { success: false, message: 'Invalid license key.' }, app, nonce);
   }
@@ -801,6 +879,7 @@ export async function clientRegister(req, res) {
   `).run(newUserId, username.trim(), cleanHwid, expiresAt, lic.id);
 
   recordAuditLog(app.user_id, app_id, 'CLIENT_USER_REGISTERED', `User '${username}' registered with license key '${lic.license_key}'`, ip);
+  syncNow(['application_users', 'licenses', 'audit_logs', 'devices']).catch(() => {});
 
   triggerDiscordWebhook(app_id, 'register', 'New User Registered', `User **${username}** registered with license key \`${lic.license_key}\`.`, [
     { name: 'Username', value: username },

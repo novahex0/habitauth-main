@@ -1,12 +1,13 @@
 import db, { generateEd25519Keypair } from '../config/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { recordAuditLog, triggerDiscordWebhook, verifyAppAccess } from '../middleware/helpers.js';
+import { queryTurso, syncNow, purgeRowFromCloud } from '../services/cloudSyncService.js';
 
 // 1. Get all applications for the authenticated user
-export function getApplications(req, res) {
+export async function getApplications(req, res) {
   const userId = req.user.id;
 
-  const apps = db.prepare(`
+  let apps = db.prepare(`
     SELECT 
       a.id, a.app_name, a.version, a.status, a.created_at, a.updated_at,
       (SELECT COUNT(*) FROM application_users WHERE app_id = a.id OR app_id = a.app_name) as total_users,
@@ -17,6 +18,31 @@ export function getApplications(req, res) {
     WHERE a.user_id = ?
     ORDER BY a.created_at DESC
   `).all(userId);
+
+  // Real-time Cloud Fallback: If 0 applications found locally, check Turso Cloud
+  if (apps.length === 0) {
+    try {
+      const remoteApps = await queryTurso('SELECT * FROM applications WHERE user_id = ?', [userId]);
+      if (remoteApps && remoteApps.length > 0) {
+        for (const rApp of remoteApps) {
+          const cols = Object.keys(rApp);
+          const placeholders = cols.map(() => '?').join(', ');
+          db.prepare(`INSERT OR REPLACE INTO applications (${cols.join(', ')}) VALUES (${placeholders})`).run(...cols.map(c => rApp[c]));
+        }
+        apps = db.prepare(`
+          SELECT 
+            a.id, a.app_name, a.version, a.status, a.created_at, a.updated_at,
+            (SELECT COUNT(*) FROM application_users WHERE app_id = a.id OR app_id = a.app_name) as total_users,
+            (SELECT COUNT(*) FROM licenses WHERE app_id = a.id OR app_id = a.app_name) as total_licenses,
+            (SELECT COUNT(*) FROM licenses WHERE (app_id = a.id OR app_id = a.app_name) AND status = 'active') as active_licenses,
+            (SELECT COUNT(*) FROM webhook_deliveries wd JOIN webhooks w ON w.id = wd.webhook_id WHERE w.app_id = a.id OR w.app_id = a.app_name) as api_requests
+          FROM applications a
+          WHERE a.user_id = ?
+          ORDER BY a.created_at DESC
+        `).all(userId);
+      }
+    } catch (e) {}
+  }
 
   res.json({ success: true, applications: apps });
 }
@@ -129,6 +155,8 @@ export function createApplication(req, res) {
     VALUES (?, ?, ?, ?, 'info', 0, ?)
   `).run('notif_' + uuidv4().slice(0, 10), userId, 'Application Created', `Application '${cleanName}' is ready with Ed25519 protection.`, now);
 
+  syncNow(['applications', 'audit_logs', 'notifications']).catch(() => {});
+
   res.status(201).json({
     success: true,
     message: 'Application created successfully with Ed25519 security keys.',
@@ -163,6 +191,7 @@ export function regenerateSecret(req, res) {
     .run(newSecret, newEdKeys.publicKeyHex, newEdKeys.privateKeyPem, now, app.id);
 
   recordAuditLog(userId, appId, 'APP_SECRET_REGENERATED', `App secret and Ed25519 keypair regenerated for '${app.app_name}'.`, req.ip);
+  syncNow('applications').catch(() => {});
 
   res.json({
     success: true,
@@ -197,6 +226,7 @@ export function updateApplication(req, res) {
     .run(updatedName, updatedVersion, updatedVersion, updatedStatus, now, appId);
 
   recordAuditLog(userId, appId, 'APPLICATION_UPDATED', `Application '${updatedName}' version updated to ${updatedVersion}`, req.ip);
+  syncNow('applications').catch(() => {});
 
   res.json({ success: true, message: 'Application updated successfully.' });
 }
@@ -213,6 +243,8 @@ export function deleteApplication(req, res) {
 
   db.prepare('DELETE FROM applications WHERE id = ?').run(appId);
   recordAuditLog(userId, appId, 'APPLICATION_DELETED', `Application '${app.app_name}' deleted.`, req.ip);
+  purgeRowFromCloud('applications', appId).catch(() => {});
+  syncNow('applications').catch(() => {});
 
   res.json({ success: true, message: `Application '${app.app_name}' deleted successfully.` });
 }

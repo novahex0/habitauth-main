@@ -2,6 +2,7 @@ import db from '../config/db.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { recordAuditLog, triggerDiscordWebhook, sendInAppNotification, verifyAppAccess } from '../middleware/helpers.js';
+import { syncNow, purgeRowFromCloud } from '../services/cloudSyncService.js';
 
 // 1. Get Application Users
 export function getAppUsers(req, res) {
@@ -144,6 +145,8 @@ export async function createAppUser(req, res) {
     { name: 'License', value: boundLicense || 'Manual Expiry' },
     { name: 'Expires At', value: expiresAt === 0 ? 'Lifetime' : new Date(expiresAt * 1000).toLocaleDateString() }
   ]);
+
+  syncNow(['application_users', 'licenses', 'audit_logs']).catch(() => {});
 
   res.status(201).json({
     success: true,
@@ -329,6 +332,8 @@ export function deleteAppUser(req, res) {
   db.prepare('DELETE FROM devices WHERE (app_id = ? OR app_id = ?) AND user_id = ?').run(app.id, app.app_name, targetUserId);
 
   recordAuditLog(actorId, app.id, 'USER_DELETED', `Deleted user '${targetUser.username}' by @${req.user.username}`, req.ip);
+  purgeRowFromCloud('application_users', targetUserId).catch(() => {});
+  syncNow(['application_users', 'devices', 'audit_logs']).catch(() => {});
   res.json({ success: true, message: `User '${targetUser.username}' deleted.` });
 }
 
